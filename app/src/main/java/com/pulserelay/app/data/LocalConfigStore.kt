@@ -5,6 +5,8 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.pulserelay.app.domain.DuplicateDetector
 import com.pulserelay.app.domain.Provider
+import org.json.JSONArray
+import org.json.JSONObject
 
 class LocalConfigStore(context: Context) {
     private val prefs = EncryptedSharedPreferences.create(
@@ -60,6 +62,45 @@ class LocalConfigStore(context: Context) {
         scamAlertCount = scamAlertCount + 1
     }
 
+    fun activityHistory(): List<ActivityEntry> {
+        val raw = prefs.getString(KEY_ACTIVITY, null) ?: return emptyList()
+        return try {
+            val array = JSONArray(raw)
+            buildList {
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    add(
+                        ActivityEntry(
+                            timestamp = obj.getLong("t"),
+                            provider = obj.getString("p"),
+                            summary = obj.getString("s"),
+                            isScam = obj.getBoolean("scam"),
+                        ),
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun recordActivity(entry: ActivityEntry) {
+        val entries = (listOf(entry) + activityHistory()).take(MAX_ACTIVITY_ENTRIES)
+        val array = JSONArray()
+        entries.forEach { item ->
+            array.put(
+                JSONObject()
+                    .put("t", item.timestamp)
+                    .put("p", item.provider)
+                    .put("s", item.summary)
+                    .put("scam", item.isScam),
+            )
+        }
+        prefs.edit().putString(KEY_ACTIVITY, array.toString()).apply()
+    }
+
+    fun clearActivity() = prefs.edit().remove(KEY_ACTIVITY).apply()
+
     fun clear() = prefs.edit().clear().apply()
 
     private companion object {
@@ -70,5 +111,7 @@ class LocalConfigStore(context: Context) {
         const val KEY_PROVIDERS = "enabled_providers"
         const val KEY_SEEN_TRX = "seen_transaction_ids"
         const val KEY_SCAM_COUNT = "scam_alert_count"
+        const val KEY_ACTIVITY = "activity_history"
+        const val MAX_ACTIVITY_ENTRIES = 50
     }
 }

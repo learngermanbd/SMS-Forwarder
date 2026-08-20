@@ -1,12 +1,20 @@
 package com.pulserelay.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import com.pulserelay.app.data.ActivityEntry
 import com.pulserelay.app.data.LocalConfigStore
 import com.pulserelay.app.domain.Provider
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,12 +38,14 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -53,6 +63,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +81,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.DateFormat
+import java.util.Date
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,6 +94,7 @@ class MainActivity : ComponentActivity() {
 private enum class AppTab(val label: String, val icon: ImageVector) {
     DASHBOARD("Home", Icons.Default.Dashboard),
     RULES("Rules", Icons.AutoMirrored.Filled.Rule),
+    ACTIVITY("Activity", Icons.Default.History),
     SETTINGS("Settings", Icons.Default.Settings),
 }
 
@@ -95,6 +109,55 @@ private fun PulseRelayApp() {
     var bkashEnabled by rememberSaveable { mutableStateOf(Provider.BKASH in configStore.enabledProviders) }
     var nagadEnabled by rememberSaveable { mutableStateOf(Provider.NAGAD in configStore.enabledProviders) }
     var rocketEnabled by rememberSaveable { mutableStateOf(Provider.ROCKET in configStore.enabledProviders) }
+    var activityEntries by remember { mutableStateOf(configStore.activityHistory()) }
+
+    var hasSmsPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
+                PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    var hasNotificationPermission by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED,
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        hasSmsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
+            PackageManager.PERMISSION_GRANTED
+        hasNotificationPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    fun requestPermissions() {
+        val needed = buildList {
+            if (!hasSmsPermission) add(Manifest.permission.RECEIVE_SMS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        if (needed.isNotEmpty()) permissionLauncher.launch(needed.toTypedArray())
+    }
+
+    var permissionPrompted by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!permissionPrompted) {
+            permissionPrompted = true
+            requestPermissions()
+        }
+    }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == AppTab.DASHBOARD.name || selectedTab == AppTab.ACTIVITY.name) {
+            activityEntries = configStore.activityHistory()
+        }
+    }
 
     Scaffold(
         containerColor = PulseColors.background,
@@ -113,6 +176,7 @@ private fun PulseRelayApp() {
                             text = when (AppTab.valueOf(selectedTab)) {
                                 AppTab.DASHBOARD -> "Your relay, at a glance"
                                 AppTab.RULES -> "Choose what gets through"
+                                AppTab.ACTIVITY -> "Redacted delivery log"
                                 AppTab.SETTINGS -> "Private by design"
                             },
                             style = MaterialTheme.typography.titleMedium,
@@ -155,6 +219,8 @@ private fun PulseRelayApp() {
                 },
                 activeProviders = listOf(bkashEnabled, nagadEnabled, rocketEnabled).count { it },
                 scamAlerts = configStore.scamAlertCount,
+                recentEntries = activityEntries,
+                onViewAll = { selectedTab = AppTab.ACTIVITY.name },
             )
             AppTab.RULES -> RulesScreen(
                 modifier = Modifier.padding(padding),
@@ -177,6 +243,14 @@ private fun PulseRelayApp() {
                     }
                 },
             )
+            AppTab.ACTIVITY -> ActivityScreen(
+                modifier = Modifier.padding(padding),
+                entries = activityEntries,
+                onClear = {
+                    configStore.clearActivity()
+                    activityEntries = emptyList()
+                },
+            )
             AppTab.SETTINGS -> SettingsScreen(
                 modifier = Modifier.padding(padding),
                 relayEnabled = relayEnabled,
@@ -184,6 +258,9 @@ private fun PulseRelayApp() {
                     relayEnabled = it
                     configStore.relayEnabled = it
                 },
+                hasSmsPermission = hasSmsPermission,
+                hasNotificationPermission = hasNotificationPermission,
+                onRequestPermissions = { requestPermissions() },
             )
         }
     }
@@ -196,6 +273,8 @@ private fun DashboardScreen(
     onRelayToggle: (Boolean) -> Unit,
     activeProviders: Int,
     scamAlerts: Int,
+    recentEntries: List<ActivityEntry>,
+    onViewAll: () -> Unit,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -212,25 +291,22 @@ private fun DashboardScreen(
             }
         }
         item {
-            SectionHeading("Recent activity", "View all")
+            SectionHeading("Recent activity", "View all", onActionClick = onViewAll)
         }
-        item {
-            ActivityCard(
-                provider = "bKash",
-                detail = "Cash In  •  safely redacted",
-                time = "Just now",
-                icon = Icons.Default.CheckCircle,
-                tint = PulseColors.mint,
-            )
-        }
-        item {
-            ActivityCard(
-                provider = "Nagad",
-                detail = "Payment received  •  delivered",
-                time = "Today, 10:42 AM",
-                icon = Icons.AutoMirrored.Filled.Send,
-                tint = PulseColors.blue,
-            )
+        if (recentEntries.isEmpty()) {
+            item {
+                EmptyActivityCard()
+            }
+        } else {
+            items(recentEntries.take(3)) { entry ->
+                ActivityCard(
+                    provider = entry.provider,
+                    detail = entry.summary,
+                    time = formatActivityTime(entry.timestamp),
+                    icon = if (entry.isScam) Icons.Default.Warning else Icons.Default.CheckCircle,
+                    tint = if (entry.isScam) PulseColors.amber else PulseColors.mint,
+                )
+            }
         }
         item {
             PrivacyBanner()
@@ -348,7 +424,14 @@ private fun RulesScreen(
 }
 
 @Composable
-private fun SettingsScreen(modifier: Modifier, relayEnabled: Boolean, onRelayToggle: (Boolean) -> Unit) {
+private fun SettingsScreen(
+    modifier: Modifier,
+    relayEnabled: Boolean,
+    onRelayToggle: (Boolean) -> Unit,
+    hasSmsPermission: Boolean,
+    hasNotificationPermission: Boolean,
+    onRequestPermissions: () -> Unit,
+) {
     val context = LocalContext.current
     val configStore = remember { LocalConfigStore(context) }
     var botToken by rememberSaveable { mutableStateOf(configStore.botToken) }
@@ -406,10 +489,24 @@ private fun SettingsScreen(modifier: Modifier, relayEnabled: Boolean, onRelayTog
             }
         }
         item {
-            SettingCard(Icons.Default.Sms, "SMS access", "Required to detect incoming wallet alerts on this device.", true, {}, PulseColors.amber)
+            PermissionCard(
+                icon = Icons.Default.Sms,
+                title = "SMS access",
+                description = if (hasSmsPermission) "Incoming wallet alerts can be detected." else "Required to detect incoming wallet alerts on this device.",
+                granted = hasSmsPermission,
+                onRequest = onRequestPermissions,
+                accent = PulseColors.amber,
+            )
         }
         item {
-            SettingCard(Icons.Default.NotificationsActive, "Delivery notifications", "Show a small status notification when an alert is delivered.", true, {}, PulseColors.blue)
+            PermissionCard(
+                icon = Icons.Default.NotificationsActive,
+                title = "Notifications",
+                description = if (hasNotificationPermission) "Delivery status can be shown." else "Allows a small status notification for delivered alerts.",
+                granted = hasNotificationPermission,
+                onRequest = onRequestPermissions,
+                accent = PulseColors.blue,
+            )
         }
         item {
             AnimatedVisibility(visible = relayEnabled) {
@@ -477,10 +574,96 @@ private fun ActivityCard(provider: String, detail: String, time: String, icon: I
 }
 
 @Composable
-private fun SectionHeading(title: String, action: String) {
+private fun ActivityScreen(
+    modifier: Modifier,
+    entries: List<ActivityEntry>,
+    onClear: () -> Unit,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Delivery log", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text("Redacted history. Raw message content is never stored.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                }
+                OutlinedButton(onClick = onClear, enabled = entries.isNotEmpty()) {
+                    Text("Clear")
+                }
+            }
+        }
+        if (entries.isEmpty()) {
+            item { EmptyActivityCard() }
+        } else {
+            items(entries) { entry ->
+                ActivityCard(
+                    provider = entry.provider,
+                    detail = entry.summary,
+                    time = formatActivityTime(entry.timestamp),
+                    icon = if (entry.isScam) Icons.Default.Warning else Icons.Default.CheckCircle,
+                    tint = if (entry.isScam) PulseColors.amber else PulseColors.mint,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyActivityCard() {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(18.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.History, null, tint = PulseColors.muted, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.size(12.dp))
+            Text("No relay activity yet.", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun PermissionCard(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    granted: Boolean,
+    onRequest: () -> Unit,
+    accent: Color,
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(20.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = accent, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.size(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(description, color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.size(12.dp))
+            if (granted) {
+                Text("Granted", color = PulseColors.mint, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            } else {
+                Button(onClick = onRequest) {
+                    Text("Grant")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeading(title: String, action: String, onActionClick: () -> Unit = {}) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        Text(action, color = PulseColors.mint, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        Text(
+            action,
+            color = PulseColors.mint,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .clickable(onClick = onActionClick)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 
@@ -507,6 +690,9 @@ private fun StatusDot(connected: Boolean) {
             .background(if (connected) PulseColors.mint else PulseColors.amber),
     )
 }
+
+private fun formatActivityTime(timestamp: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
 
 private object PulseColors {
     val background = Color(0xFF0B1018)

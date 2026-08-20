@@ -3,6 +3,7 @@ package com.pulserelay.app.platform
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.pulserelay.app.data.ActivityEntry
 import com.pulserelay.app.data.LocalConfigStore
 import com.pulserelay.app.network.TelegramBotClient
 
@@ -35,12 +36,22 @@ class RelayWorker(
                 append(body)
             }
         }
-        return TelegramBotClient()
+        val result = TelegramBotClient()
             .sendMessage(config.botToken, config.channelId, text)
-            .fold(
-                onSuccess = { Result.success() },
-                onFailure = { Result.retry() },
+        if (result.isSuccess) {
+            config.recordActivity(
+                ActivityEntry(
+                    timestamp = inputData.getLong(KEY_RECEIVED_AT, System.currentTimeMillis()),
+                    provider = provider,
+                    summary = if (isScamAlert) "Duplicate transaction alert" else "Receipt relayed",
+                    isScam = isScamAlert,
+                ),
             )
+        }
+        return result.fold(
+            onSuccess = { Result.success() },
+            onFailure = { Result.retry() },
+        )
     }
 
     companion object {
