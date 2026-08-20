@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PulseRelay · Android SMS to Telegram Blueprint</title>
+  <style>
+    :root {
+      --bg: #0b1018; --panel: #141c27; --panel-2: #1d2938; --ink: #f4f7fb;
+      --muted: #91a0b4; --mint: #56d6b0; --blue: #77a9ff; --amber: #ffc46b;
+      --line: rgba(255,255,255,.10); --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.65 Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    a { color: var(--mint); }
+    .shell { max-width: 1120px; margin: auto; padding: 32px 22px 80px; }
+    .hero { background: linear-gradient(135deg, #163b42, #182438); border: 1px solid var(--line); border-radius: 30px; padding: 42px; position: relative; overflow: hidden; }
+    .hero:after { content: ""; position: absolute; width: 260px; height: 260px; border: 1px solid rgba(86,214,176,.25); border-radius: 50%; right: -80px; top: -90px; box-shadow: 0 0 0 28px rgba(86,214,176,.05), 0 0 0 56px rgba(86,214,176,.035); }
+    .eyebrow { color: var(--mint); font-weight: 800; letter-spacing: .18em; font-size: 12px; }
+    h1 { font-size: clamp(34px, 6vw, 64px); line-height: 1.02; max-width: 720px; margin: 16px 0; letter-spacing: -.05em; }
+    h2 { font-size: 27px; margin: 48px 0 16px; letter-spacing: -.03em; }
+    h3 { font-size: 17px; margin: 0 0 8px; }
+    p { color: var(--muted); max-width: 800px; }
+    .lede { font-size: 18px; max-width: 700px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .grid.two { grid-template-columns: repeat(2, 1fr); }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+    .card p { margin: 4px 0 0; font-size: 14px; }
+    .icon { width: 40px; height: 40px; border-radius: 13px; background: rgba(86,214,176,.12); display: grid; place-items: center; color: var(--mint); font-weight: 900; margin-bottom: 18px; }
+    .tag { display: inline-block; padding: 3px 9px; border-radius: 99px; background: rgba(86,214,176,.12); color: var(--mint); font-size: 12px; font-weight: 700; margin: 3px 4px 3px 0; }
+    .warn { border-color: rgba(255,196,107,.35); background: rgba(255,196,107,.07); }
+    .warn .icon { color: var(--amber); background: rgba(255,196,107,.13); }
+    .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 18px 0; }
+    .step { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 13px; color: #dce5f0; font-weight: 650; }
+    .arrow { color: var(--mint); font-size: 20px; }
+    pre { overflow: auto; border-radius: 16px; padding: 18px; color: #dce5f0; background: #080c12; border: 1px solid var(--line); }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
+    li { color: var(--muted); margin: 5px 0; }
+    li strong, .card strong { color: var(--ink); }
+    .phase { display: grid; grid-template-columns: 58px 1fr; gap: 18px; align-items: start; }
+    .phase-num { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; background: var(--mint); color: #10201e; font-weight: 900; }
+    .checklist { list-style: none; padding: 0; }
+    .checklist li:before { content: "✓"; color: var(--mint); font-weight: 900; margin-right: 10px; }
+    footer { border-top: 1px solid var(--line); margin-top: 60px; padding-top: 20px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 760px) { .grid, .grid.two { grid-template-columns: 1fr; } .hero { padding: 28px 22px; } h2 { margin-top: 36px; } .arrow { transform: rotate(90deg); } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="eyebrow">PULSERELAY · ANDROID PRODUCT BLUEPRINT</div>
+      <h1>Private wallet alerts, delivered with intention.</h1>
+      <p class="lede">A premium Android companion that recognizes Bangladesh bKash, Nagad, and Rocket transaction SMS messages on-device, removes sensitive data, and posts only safe events to an owned Telegram channel through a bot.</p>
+      <div><span class="tag">Kotlin</span><span class="tag">Jetpack Compose</span><span class="tag">Material 3</span><span class="tag">WorkManager</span><span class="tag">Encrypted storage</span></div>
+    </header>
+
+    <section>
+      <h2>1. Product boundary</h2>
+      <div class="grid">
+        <article class="card"><div class="icon">01</div><h3>Approved sources only</h3><p>Start with a strict allow-list for bKash, Nagad, and Rocket sender IDs. Unknown senders and arbitrary messages stay on the phone.</p></article>
+        <article class="card"><div class="icon">02</div><h3>Safe by default</h3><p>OTP, PIN, verification-code content, phone numbers, and long identifier sequences are blocked or redacted before any network request.</p></article>
+        <article class="card"><div class="icon">03</div><h3>Owned destination</h3><p>The user configures a bot they control and a private channel where the bot has posting permission. No shared relay service is required.</p></article>
+      </div>
+      <div class="card warn" style="margin-top:14px"><div class="icon">!</div><h3>Important Android and privacy note</h3><p>These are financial notifications. Use the app only on a phone and Telegram channel you own or have explicit permission to monitor. Android/Google Play SMS permissions are restricted; a Play release may require the app to qualify as a default SMS handler or another permitted exception. Most Bangladesh wallet alerts arrive as SMS, not MMS, so the implementation uses the SMS broadcast path instead of scraping arbitrary MMS parts.</p></div>
+    </section>
+
+    <section>
+      <h2>2. Premium UI direction</h2>
+      <div class="grid two">
+        <article class="card"><h3>Visual language</h3><ul><li>Deep navy canvas with elevated slate surfaces.</li><li>Mint green for trust, active state, and successful delivery.</li><li>Soft blue for Telegram actions; amber for attention.</li><li>Large rounded cards, restrained gradients, generous spacing, and readable type.</li></ul></article>
+        <article class="card"><h3>Experience principles</h3><ul><li>One clear action per screen: enable, pause, configure, or review.</li><li>Never show raw SMS text in the activity feed.</li><li>Show exactly what the filter will do before the user enables it.</li><li>Make relay health visible without making the screen noisy.</li></ul></article>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <article class="card"><h3>Dashboard</h3><p>Connection health, live/pause control, matched today, items needing review, recent redacted activity, and a privacy reassurance.</p></article>
+        <article class="card"><h3>Rules</h3><p>Three provider cards with switches, local-matching explanation, and the redaction control. The visual state maps to encrypted local settings.</p></article>
+        <article class="card"><h3>Settings</h3><p>Masked bot-token entry, channel ID, encrypted save, SMS access explanation, and delivery-notification controls.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Technical architecture</h2>
+      <div class="flow">
+        <div class="step">SMS_RECEIVED</div><span class="arrow">→</span><div class="step">SmsReceiver</div><span class="arrow">→</span><div class="step">Local MessageFilter</div><span class="arrow">→</span><div class="step">Redacted payload</div><span class="arrow">→</span><div class="step">WorkManager</div><span class="arrow">→</span><div class="step">Telegram Bot API</div>
+      </div>
+      <div class="grid two">
+        <article class="card"><h3>Runtime components</h3><ul class="checklist"><li><strong>Compose UI:</strong> dashboard, rules, and settings.</li><li><strong>MessageFilter:</strong> pure Kotlin allow-list and redaction logic.</li><li><strong>SmsReceiver:</strong> accepts incoming SMS only.</li><li><strong>RelayWorker:</strong> network constraint, retry, and delivery.</li><li><strong>LocalConfigStore:</strong> Android encrypted preferences for token, destination, rules, and enabled state.</li><li><strong>TelegramBotClient:</strong> minimal sendMessage client with no credential logging.</li></ul></article>
+        <article class="card"><h3>Recommended production additions</h3><ul class="checklist"><li>Bounded redacted history using Room or SQLCipher.</li><li>Notification channel and Android 13 notification permission flow.</li><li>Bot permission validation and a safe test-send flow.</li><li>Exponential backoff with rate-limit-aware handling.</li><li>Pause, delete history, clear credentials, and export controls.</li><li>Device reboot and battery-optimization education.</li></ul></article>
+      </div>
+      <pre><code>app/src/main/java/com/pulserelay/app/
+├── MainActivity.kt
+├── data/LocalConfigStore.kt
+├── domain/MessageFilter.kt
+├── network/TelegramBotClient.kt
+└── platform/
+    ├── SmsReceiver.kt
+    └── RelayWorker.kt</code></pre>
+    </section>
+
+    <section>
+      <h2>4. Build plan</h2>
+      <article class="card phase"><div class="phase-num">1</div><div><h3>Foundation · completed in this workspace</h3><p>Set up the Android/Compose project, Material 3 theme, premium three-tab UI, provider allow-list, local redaction tests, encrypted configuration, SMS receiver, WorkManager queue, and Telegram client skeleton.</p></div></article>
+      <article class="card phase" style="margin-top:10px"><div class="phase-num">2</div><div><h3>Connect and verify</h3><p>Add a real configuration flow with token validation, channel permission checks, an explicit non-financial test send, runtime SMS permission prompts, and a visible error state for invalid credentials or a missing bot admin permission.</p></div></article>
+      <article class="card phase" style="margin-top:10px"><div class="phase-num">3</div><div><h3>Reliability</h3><p>Add a bounded redacted audit history, delivery status, duplicate protection, retry/backoff, offline queue visibility, reboot recovery, and notification channels. Do not store raw SMS bodies.</p></div></article>
+      <article class="card phase" style="margin-top:10px"><div class="phase-num">4</div><div><h3>Security and compliance</h3><p>Threat-model token theft and unauthorized forwarding, review all logs, add clear consent and privacy copy, test Android permission behavior, decide sideload versus Play distribution, and perform a security review before real use.</p></div></article>
+      <article class="card phase" style="margin-top:10px"><div class="phase-num">5</div><div><h3>Release</h3><p>Test on physical Android devices and multiple carriers, generate a signed AAB/APK, write recovery instructions, document the BotFather/channel setup, and monitor only aggregate health metrics without message content.</p></div></article>
+    </section>
+
+    <section>
+      <h2>5. Telegram setup checklist</h2>
+      <div class="grid two">
+        <article class="card"><h3>Bot</h3><ol><li>Create a bot with BotFather.</li><li>Copy the token into PulseRelay only; never commit it.</li><li>Keep the bot limited to the destination channel.</li></ol></article>
+        <article class="card"><h3>Channel</h3><ol><li>Create or select a private Telegram channel.</li><li>Add the bot as an administrator with permission to post.</li><li>Enter the channel chat ID and use a safe test message first.</li></ol></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>6. Skill/tooling note</h2>
+      <div class="card"><p>This checkout did not contain an existing Android project or an available “find skill” installer. The implementation uses the standard Android toolchain already declared in the project: Android Gradle Plugin, Kotlin, Jetpack Compose, Material 3, WorkManager, Android encrypted storage, and OkHttp. No external skill package or production credential was installed.</p></div>
+    </section>
+
+    <section>
+      <h2>7. Validation gates</h2>
+      <ul class="checklist">
+        <li>Unit tests prove bKash/Nagad/Rocket matching, unknown-sender rejection, OTP rejection, and redaction.</li>
+        <li>Manual device test proves a safe sample is delivered to the private channel.</li>
+        <li>Manual test proves unknown sender and OTP content never create a work request.</li>
+        <li>Network inspection proves the bot token is not written to logs or UI activity history.</li>
+        <li>Pause and delete controls are tested after reboot and while offline.</li>
+      </ul>
+    </section>
+
+    <footer>PulseRelay blueprint · Android-first · privacy-preserving by default · generated for the local workspace</footer>
+  </main>
+</body>
+</html>

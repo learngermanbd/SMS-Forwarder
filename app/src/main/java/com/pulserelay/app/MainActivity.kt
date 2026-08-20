@@ -1,0 +1,531 @@
+package com.pulserelay.app
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import com.pulserelay.app.data.LocalConfigStore
+import com.pulserelay.app.domain.Provider
+import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Rule
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent { PulseRelayTheme { PulseRelayApp() } }
+    }
+}
+
+private enum class AppTab(val label: String, val icon: ImageVector) {
+    DASHBOARD("Home", Icons.Default.Dashboard),
+    RULES("Rules", Icons.Default.Rule),
+    SETTINGS("Settings", Icons.Default.Settings),
+}
+
+@Composable
+private fun PulseRelayApp() {
+    val context = LocalContext.current
+    val configStore = remember { LocalConfigStore(context) }
+    var selectedTab by rememberSaveable { mutableStateOf(AppTab.DASHBOARD.name) }
+    var relayEnabled by rememberSaveable { mutableStateOf(configStore.relayEnabled) }
+    var redactSensitive by rememberSaveable { mutableStateOf(configStore.redactSensitiveData) }
+    var bkashEnabled by rememberSaveable { mutableStateOf(Provider.BKASH in configStore.enabledProviders) }
+    var nagadEnabled by rememberSaveable { mutableStateOf(Provider.NAGAD in configStore.enabledProviders) }
+    var rocketEnabled by rememberSaveable { mutableStateOf(Provider.ROCKET in configStore.enabledProviders) }
+
+    Scaffold(
+        containerColor = PulseColors.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = "PULSERELAY",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = PulseColors.mint,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp,
+                        )
+                        Text(
+                            text = when (AppTab.valueOf(selectedTab)) {
+                                AppTab.DASHBOARD -> "Your relay, at a glance"
+                                AppTab.RULES -> "Choose what gets through"
+                                AppTab.SETTINGS -> "Private by design"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                },
+                actions = {
+                    StatusDot(connected = relayEnabled)
+                    Spacer(Modifier.size(16.dp))
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PulseColors.background),
+            )
+        },
+        bottomBar = {
+            NavigationBar(
+                modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+                containerColor = PulseColors.surface,
+                tonalElevation = 0.dp,
+            ) {
+                AppTab.entries.forEach { tab ->
+                    NavigationBarItem(
+                        selected = selectedTab == tab.name,
+                        onClick = { selectedTab = tab.name },
+                        icon = { Icon(tab.icon, contentDescription = tab.label) },
+                        label = { Text(tab.label) },
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        when (AppTab.valueOf(selectedTab)) {
+            AppTab.DASHBOARD -> DashboardScreen(
+                modifier = Modifier.padding(padding),
+                relayEnabled = relayEnabled,
+                onRelayToggle = {
+                    relayEnabled = it
+                    configStore.relayEnabled = it
+                },
+            )
+            AppTab.RULES -> RulesScreen(
+                modifier = Modifier.padding(padding),
+                redactSensitive = redactSensitive,
+                onRedactionToggle = {
+                    redactSensitive = it
+                    configStore.redactSensitiveData = it
+                },
+                providerStates = listOf(bkashEnabled, nagadEnabled, rocketEnabled),
+                onProviderToggle = { index, enabled ->
+                    when (index) {
+                        0 -> bkashEnabled = enabled
+                        1 -> nagadEnabled = enabled
+                        2 -> rocketEnabled = enabled
+                    }
+                    configStore.enabledProviders = buildSet {
+                        if (bkashEnabled) add(Provider.BKASH)
+                        if (nagadEnabled) add(Provider.NAGAD)
+                        if (rocketEnabled) add(Provider.ROCKET)
+                    }
+                },
+            )
+            AppTab.SETTINGS -> SettingsScreen(
+                modifier = Modifier.padding(padding),
+                relayEnabled = relayEnabled,
+                onRelayToggle = {
+                    relayEnabled = it
+                    configStore.relayEnabled = it
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardScreen(
+    modifier: Modifier = Modifier,
+    relayEnabled: Boolean,
+    onRelayToggle: (Boolean) -> Unit,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item {
+            HeroCard(relayEnabled = relayEnabled, onRelayToggle = onRelayToggle)
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricCard(Modifier.weight(1f), "12", "Matched today", PulseColors.mint)
+                MetricCard(Modifier.weight(1f), "0", "Needs review", PulseColors.amber)
+            }
+        }
+        item {
+            SectionHeading("Recent activity", "View all")
+        }
+        item {
+            ActivityCard(
+                provider = "bKash",
+                detail = "Cash In  •  safely redacted",
+                time = "Just now",
+                icon = Icons.Default.CheckCircle,
+                tint = PulseColors.mint,
+            )
+        }
+        item {
+            ActivityCard(
+                provider = "Nagad",
+                detail = "Payment received  •  delivered",
+                time = "Today, 10:42 AM",
+                icon = Icons.Default.Send,
+                tint = PulseColors.blue,
+            )
+        }
+        item {
+            PrivacyBanner()
+        }
+    }
+}
+
+@Composable
+private fun HeroCard(relayEnabled: Boolean, onRelayToggle: (Boolean) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    ) {
+        Box(
+            modifier = Modifier
+                .background(
+                    Brush.linearGradient(listOf(PulseColors.heroStart, PulseColors.heroEnd)),
+                )
+                .padding(22.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.NotificationsActive, null, tint = PulseColors.mint)
+                    }
+                    Spacer(Modifier.size(12.dp))
+                    Column {
+                        Text("Telegram relay", color = Color.White.copy(alpha = .72f), style = MaterialTheme.typography.bodySmall)
+                        Text(if (relayEnabled) "Live and protected" else "Ready to connect", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Text(
+                    "Only approved wallet alerts are matched on this device. Everything else stays private.",
+                    color = Color.White.copy(alpha = .76f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = { onRelayToggle(!relayEnabled) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (relayEnabled) Color.White.copy(alpha = .14f) else PulseColors.mint,
+                            contentColor = if (relayEnabled) Color.White else PulseColors.ink,
+                        ),
+                    ) {
+                        Icon(if (relayEnabled) Icons.Default.CloudOff else Icons.Default.PlayArrow, null, Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(if (relayEnabled) "Pause relay" else "Enable relay", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text(if (relayEnabled) "ON" else "OFF", color = Color.White.copy(alpha = .65f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RulesScreen(
+    modifier: Modifier,
+    redactSensitive: Boolean,
+    onRedactionToggle: (Boolean) -> Unit,
+    providerStates: List<Boolean>,
+    onProviderToggle: (Int, Boolean) -> Unit,
+) {
+    val providers = listOf(
+        Triple("bKash", "bK", "Official bKash transaction alerts"),
+        Triple("Nagad", "NG", "Official Nagad transaction alerts"),
+        Triple("Rocket", "RK", "DBBL Rocket transaction alerts"),
+    )
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Text("Approved sources", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Text("PulseRelay checks the sender and message content locally before anything can reach Telegram.", color = PulseColors.muted)
+        }
+        items(providers.indices.toList()) { index ->
+            val provider = providers[index]
+            ProviderCard(provider.first, provider.second, provider.third, providerStates[index]) { enabled -> onProviderToggle(index, enabled) }
+        }
+        item {
+            Spacer(Modifier.height(4.dp))
+            SettingCard(
+                icon = Icons.Default.Shield,
+                title = "Redact sensitive numbers",
+                description = "Hide phone numbers, OTP-like sequences, and PIN content before delivery.",
+                checked = redactSensitive,
+                onCheckedChange = onRedactionToggle,
+                accent = PulseColors.mint,
+            )
+        }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = PulseColors.surface),
+                shape = RoundedCornerShape(18.dp),
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+                    Icon(Icons.Default.Lock, null, tint = PulseColors.mint, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.size(12.dp))
+                    Text("Privacy first. OTP and PIN messages are blocked even when a provider is enabled.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsScreen(modifier: Modifier, relayEnabled: Boolean, onRelayToggle: (Boolean) -> Unit) {
+    val context = LocalContext.current
+    val configStore = remember { LocalConfigStore(context) }
+    var botToken by rememberSaveable { mutableStateOf(configStore.botToken) }
+    var channelId by rememberSaveable { mutableStateOf(configStore.channelId) }
+    var saved by rememberSaveable { mutableStateOf(false) }
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Send, null, tint = PulseColors.blue, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.size(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Telegram destination", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(if (relayEnabled) "Bot connected • channel protected" else "Not connected yet", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        StatusDot(connected = relayEnabled)
+                    }
+                    OutlinedTextField(
+                        value = botToken,
+                        onValueChange = { botToken = it; saved = false },
+                        label = { Text("Bot token") },
+                        placeholder = { Text("123456:ABC…") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = channelId,
+                        onValueChange = { channelId = it; saved = false },
+                        label = { Text("Channel ID") },
+                        placeholder = { Text("-1001234567890") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = {
+                            configStore.botToken = botToken
+                            configStore.channelId = channelId
+                            saved = true
+                            onRelayToggle(botToken.isNotBlank() && channelId.isNotBlank())
+                        },
+                        enabled = botToken.isNotBlank() && channelId.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (saved) "Saved securely" else "Save and connect")
+                    }
+                    Text("Keep this bot restricted to a private channel. The token is stored using Android encrypted storage and is never displayed in the activity feed.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        item {
+            SettingCard(Icons.Default.Sms, "SMS access", "Required to detect incoming wallet alerts on this device.", true, {}, PulseColors.amber)
+        }
+        item {
+            SettingCard(Icons.Default.NotificationsActive, "Delivery notifications", "Show a small status notification when an alert is delivered.", true, {}, PulseColors.blue)
+        }
+        item {
+            AnimatedVisibility(visible = relayEnabled) {
+                Text("Telegram credentials are stored locally using Android encrypted storage.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderCard(name: String, initials: String, description: String, enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(20.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp).clip(CircleShape).background(PulseColors.surfaceElevated), contentAlignment = Alignment.Center) {
+                Text(initials, color = PulseColors.mint, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.size(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(name, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(description, color = PulseColors.muted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Switch(checked = enabled, onCheckedChange = onEnabledChange)
+        }
+    }
+}
+
+@Composable
+private fun SettingCard(icon: ImageVector, title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, accent: Color) {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(20.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = accent, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.size(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(description, color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
+}
+
+@Composable
+private fun MetricCard(modifier: Modifier, value: String, label: String, color: Color) {
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(value, color = color, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text(label, color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun ActivityCard(provider: String, detail: String, time: String, icon: ImageVector, tint: Color) {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(18.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.size(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(provider, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(detail, color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Text(time, color = PulseColors.muted, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun SectionHeading(title: String, action: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(action, color = PulseColors.mint, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun PrivacyBanner() {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.mint.copy(alpha = .10f)), shape = RoundedCornerShape(18.dp)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Shield, null, tint = PulseColors.mint, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.size(12.dp))
+            Column {
+                Text("Protected on this phone", color = PulseColors.mint, fontWeight = FontWeight.Bold)
+                Text("Filtering and redaction happen before the network request.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusDot(connected: Boolean) {
+    Box(
+        Modifier
+            .size(10.dp)
+            .clip(CircleShape)
+            .background(if (connected) PulseColors.mint else PulseColors.amber),
+    )
+}
+
+private object PulseColors {
+    val background = Color(0xFF0B1018)
+    val surface = Color(0xFF141C27)
+    val surfaceElevated = Color(0xFF1D2938)
+    val heroStart = Color(0xFF163B42)
+    val heroEnd = Color(0xFF182438)
+    val mint = Color(0xFF56D6B0)
+    val blue = Color(0xFF77A9FF)
+    val amber = Color(0xFFFFC46B)
+    val ink = Color(0xFF10201E)
+    val muted = Color(0xFF91A0B4)
+}
+
+@Composable
+private fun PulseRelayTheme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = androidx.compose.material3.darkColorScheme(
+            primary = PulseColors.mint,
+            onPrimary = PulseColors.ink,
+            secondary = PulseColors.blue,
+            background = PulseColors.background,
+            surface = PulseColors.surface,
+            onSurface = Color.White,
+        ),
+        content = content,
+    )
+}

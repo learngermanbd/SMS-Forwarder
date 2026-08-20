@@ -1,0 +1,43 @@
+# PulseRelay
+
+PulseRelay is an Android SMS notification relay for personal, consent-based use. It recognizes Bangladesh mobile-finance alerts from **bKash**, **Nagad**, and **Rocket**, applies privacy filters on-device, and can send a redacted event to a Telegram channel through a bot.
+
+> **Safety default:** financial SMS messages can contain OTPs, PIN hints, account identifiers, and balances. PulseRelay must not forward OTPs, PINs, or an unredacted message. Use it only on a phone and Telegram channel you own or have explicit permission to monitor.
+
+## Current foundation
+
+- Kotlin + Jetpack Compose + Material 3
+- Premium dark dashboard UI with Dashboard, Rules, and Settings sections
+- Provider rules for bKash, Nagad, and Rocket
+- On-device provider matching and sensitive-number redaction
+- Pure Kotlin filter logic that can be unit tested
+- Android SMS receiver and Telegram delivery worker skeleton
+
+## Build locally
+
+1. Open this folder in Android Studio Ladybug (or newer).
+2. Let Android Studio create/download the Gradle wrapper if this checkout does not already contain one.
+3. Run the `app` configuration on an Android 8.0+ device/emulator.
+4. Grant SMS permission only on a test device where you have consent.
+5. Configure the Telegram bot token and channel ID in the app. Never commit either value.
+
+The app is intentionally not configured with a real bot token, chat ID, or production signing key.
+
+## Telegram setup
+
+1. Create a bot with BotFather.
+2. Add it as an administrator to a private channel with permission to post messages.
+3. Find the channel chat ID using a controlled test chat or a trusted Telegram API client.
+4. Save the token only in the app's encrypted local settings.
+5. Test with a non-financial sample notification before enabling the receiver.
+
+## Android policy and platform notes
+
+SMS permissions are restricted by Google Play policy. A production Play release may require PulseRelay to be the default SMS handler or qualify for an allowed exception. For a personal sideloaded build, obtain informed consent and follow local law. Most bKash/Nagad/Rocket transaction alerts arrive as SMS; MMS/WAP push is not a reliable source for these notifications and should not be treated as equivalent to SMS.
+
+## Planned phases
+
+1. **Foundation:** UI, rules, redaction, local encrypted configuration.
+2. **Reliable relay:** receiver, WorkManager queue, retry/backoff, delivery status, offline handling.
+3. **Production hardening:** encrypted local history, notification permission, battery-exemption education, export/delete controls, accessibility, localization, and device testing across Android versions.
+4. **Release:** security review, abuse/consent safeguards, Play policy decision, signed APK/AAB, and operational documentation.
