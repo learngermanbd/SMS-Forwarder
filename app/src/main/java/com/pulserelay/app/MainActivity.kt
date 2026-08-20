@@ -82,6 +82,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontWeight
@@ -181,28 +182,44 @@ private fun PulseRelayApp() {
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = "PULSERELAY",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = PulseColors.mint,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.sp,
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_launcher_foreground),
+                            contentDescription = null,
+                            tint = PulseColors.mint,
+                            modifier = Modifier.size(30.dp),
                         )
-                        Text(
-                            text = when (AppTab.valueOf(selectedTab)) {
-                                AppTab.DASHBOARD -> "Your relay, at a glance"
-                                AppTab.RULES -> "Choose what gets through"
-                                AppTab.ACTIVITY -> "Redacted delivery log"
-                                AppTab.SETTINGS -> "Private by design"
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                        Spacer(Modifier.size(10.dp))
+                        Column {
+                            Text(
+                                text = "PulseRelay",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = PulseColors.mint,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp,
+                            )
+                            Text(
+                                text = when (AppTab.valueOf(selectedTab)) {
+                                    AppTab.DASHBOARD -> "Your private relay, at a glance"
+                                    AppTab.RULES -> "Choose your sources and filters"
+                                    AppTab.ACTIVITY -> "Redacted delivery log"
+                                    AppTab.SETTINGS -> "Connection and privacy"
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                 },
                 actions = {
+                    Text(
+                        text = if (relayEnabled) "Live" else "Paused",
+                        color = if (relayEnabled) PulseColors.mint else PulseColors.amber,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.size(6.dp))
                     StatusDot(connected = relayEnabled)
                     Spacer(Modifier.size(16.dp))
                 },
@@ -335,7 +352,7 @@ private fun DashboardScreen(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard(Modifier.weight(1f), "$activeSenders", "Active senders", PulseColors.mint)
+                MetricCard(Modifier.weight(1f), "$activeSenders", "Senders monitored", PulseColors.mint)
                 MetricCard(Modifier.weight(1f), "$scamAlerts", "Scam alerts", PulseColors.amber)
             }
         }
@@ -395,7 +412,7 @@ private fun HeroCard(relayEnabled: Boolean, onRelayToggle: (Boolean) -> Unit) {
                     }
                 }
                 Text(
-                    "Only approved wallet alerts are matched on this device. Everything else stays private.",
+                    "Only senders you approve are matched on this device. Nothing else ever leaves your phone.",
                     color = Color.White.copy(alpha = .76f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -463,20 +480,20 @@ private fun RulesScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Approved senders", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Choose your senders", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
-            Text("Pick the senders whose receipts should be relayed. Only selected senders can ever reach Telegram.", color = PulseColors.muted)
+            Text("Select the senders you trust. Only these senders can reach your Telegram channel.", color = PulseColors.muted)
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Quick select", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("Quick start", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         OutlinedButton(onClick = { reloadKey++ }) {
                             Text("Refresh")
                         }
                     }
-                    Text("Automatically select senders that look like bKash, Nagad, or Rocket.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                    Text("Select senders that look like bKash, Nagad, or Rocket in one tap.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(
                         onClick = { onAddSenders(suggested.map { it.address }.toSet()) },
                         enabled = suggested.isNotEmpty(),
@@ -515,10 +532,14 @@ private fun RulesScreen(
             }
         }
         item {
+            Spacer(Modifier.height(4.dp))
+            Text("Privacy filters", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        item {
             SettingCard(
                 icon = Icons.Default.Shield,
-                title = "Redact sensitive numbers",
-                description = "Hide phone numbers and long numeric identifiers before delivery.",
+                title = "Hide phone numbers",
+                description = "Replace phone numbers and long identifiers with placeholders before delivery.",
                 checked = redactSensitive,
                 onCheckedChange = onRedactionToggle,
                 accent = PulseColors.mint,
@@ -527,8 +548,8 @@ private fun RulesScreen(
         item {
             SettingCard(
                 icon = Icons.Default.Lock,
-                title = "Block OTP & passwords",
-                description = "Do not relay messages that look like one-time codes, PINs, or passwords.",
+                title = "Block codes & passwords",
+                description = "Never relay messages that look like one-time codes, PINs, or passwords.",
                 checked = blockOtpContent,
                 onCheckedChange = onBlockOtpToggle,
                 accent = PulseColors.amber,
@@ -537,8 +558,8 @@ private fun RulesScreen(
         item {
             SettingCard(
                 icon = Icons.Default.Shield,
-                title = "Hide balance amounts",
-                description = "Replace BDT, Tk, and Taka amounts with [balance hidden].",
+                title = "Hide balances",
+                description = "Replace BDT, Tk, and Taka amounts with a placeholder.",
                 checked = hideBalance,
                 onCheckedChange = onHideBalanceToggle,
                 accent = PulseColors.blue,
@@ -549,7 +570,7 @@ private fun RulesScreen(
                 SmsReadGrantCard(onRequest = onRequestPermissions)
             }
             loading -> item {
-                Text("Reading your inbox…", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
+                Text("Reading your messages…", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
             }
             senders.isEmpty() -> item {
                 EmptySenderCard()
@@ -573,7 +594,7 @@ private fun RulesScreen(
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Default.Lock, null, tint = PulseColors.mint, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.size(12.dp))
-                    Text("Privacy first. OTP and PIN messages are blocked even for selected senders.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                    Text("Privacy first. Codes, passwords, and other sensitive content are filtered before anything reaches Telegram.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -655,8 +676,8 @@ private fun SettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.Send, null, tint = PulseColors.blue, modifier = Modifier.size(22.dp))
                         Spacer(Modifier.size(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("Telegram destination", color = Color.White, fontWeight = FontWeight.Bold)
-                            Text(if (relayEnabled) "Bot connected • channel protected" else "Not connected yet", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                            Text("Telegram channel", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(if (relayEnabled) "Connected • channel protected" else "Not connected", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
                         }
                         StatusDot(connected = relayEnabled)
                     }
@@ -697,7 +718,7 @@ private fun SettingsScreen(
             PermissionCard(
                 icon = Icons.Default.Sms,
                 title = "SMS access",
-                description = if (hasSmsPermission) "Incoming wallet alerts can be detected." else "Required to detect incoming wallet alerts on this device.",
+                description = if (hasSmsPermission) "Wallet receipts can be detected." else "Required to detect incoming wallet receipts.",
                 granted = hasSmsPermission,
                 onRequest = onRequestPermissions,
                 accent = PulseColors.amber,
@@ -707,7 +728,7 @@ private fun SettingsScreen(
             PermissionCard(
                 icon = Icons.Default.NotificationsActive,
                 title = "Notifications",
-                description = if (hasNotificationPermission) "Delivery status can be shown." else "Allows a small status notification for delivered alerts.",
+                description = if (hasNotificationPermission) "Delivery alerts can be shown." else "Allows a small notification when a receipt is delivered.",
                 granted = hasNotificationPermission,
                 onRequest = onRequestPermissions,
                 accent = PulseColors.blue,
@@ -743,7 +764,7 @@ private fun SettingsScreen(
         }
         item {
             AnimatedVisibility(visible = relayEnabled) {
-                Text("Telegram credentials are stored locally using Android encrypted storage.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                Text("Your token is stored in Android encrypted storage and is only ever sent to Telegram.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -782,7 +803,7 @@ private fun EmptySenderCard() {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Sms, null, tint = PulseColors.muted, modifier = Modifier.size(22.dp))
             Spacer(Modifier.size(12.dp))
-            Text("No SMS messages found. Grant SMS access, then refresh.", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
+            Text("No messages found. Allow SMS access, then tap Refresh.", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -796,7 +817,7 @@ private fun SmsReadGrantCard(onRequest: () -> Unit) {
                 Spacer(Modifier.size(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("SMS reading is off", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Allow reading your messages to list senders and pick the ones to relay.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                    Text("Allow message access to list senders and choose which ones to relay.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
             OutlinedButton(onClick = onRequest, modifier = Modifier.fillMaxWidth()) {
@@ -861,7 +882,7 @@ private fun ActivityScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Delivery log", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("Redacted history. Raw message content is never stored.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                    Text("A redacted history of relayed receipts and alerts. Raw message content is never stored.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
                 }
                 OutlinedButton(onClick = onClear, enabled = entries.isNotEmpty()) {
                     Text("Clear")
@@ -890,7 +911,7 @@ private fun EmptyActivityCard() {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.History, null, tint = PulseColors.muted, modifier = Modifier.size(22.dp))
             Spacer(Modifier.size(12.dp))
-            Text("No relay activity yet.", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
+            Text("No relay activity yet. Delivered receipts will appear here.", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -947,8 +968,8 @@ private fun PermissionBanner(onRequest: () -> Unit) {
             Icon(Icons.Default.Sms, null, tint = PulseColors.amber, modifier = Modifier.size(22.dp))
             Spacer(Modifier.size(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("SMS access needed", color = Color.White, fontWeight = FontWeight.Bold)
-                Text("Allow SMS access so wallet receipts can be detected.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                Text("SMS access required", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Allow SMS access so PulseRelay can detect wallet receipts.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.size(12.dp))
             Button(onClick = onRequest) {
@@ -966,7 +987,7 @@ private fun PrivacyBanner() {
             Spacer(Modifier.size(12.dp))
             Column {
                 Text("Protected on this phone", color = PulseColors.mint, fontWeight = FontWeight.Bold)
-                Text("Filtering and redaction happen before the network request.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                Text("Filtering and redaction happen on this device, before anything is sent.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
