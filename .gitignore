@@ -7,6 +7,9 @@
 *.iml
 local.properties
 
+# Workspace metadata
+.freebuff/
+
 # Signing and local secrets
 *.jks
 *.keystore
