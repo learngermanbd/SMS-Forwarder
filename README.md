@@ -10,7 +10,8 @@ PulseRelay is an Android SMS notification relay for personal, consent-based use.
 - Premium dark dashboard UI with Dashboard, Rules, and Settings sections
 - Provider rules for bKash, Nagad, and Rocket
 - On-device provider matching and sensitive-number redaction
-- Pure Kotlin filter logic that can be unit tested
+- Duplicate transaction ID detection with a clearly marked Telegram scam alert
+- Pure Kotlin filter and detection logic that can be unit tested
 - Android SMS receiver and Telegram delivery worker skeleton
 
 ## Build locally
@@ -31,6 +32,15 @@ The app is intentionally not configured with a real bot token, chat ID, or produ
 - **Android 16–17:** the app is designed to remain compatible through Android's forward-compatibility behavior, but Android 17-specific APIs cannot be compiled until the corresponding official SDK is available. Re-test each new platform release before distribution.
 
 The release APK is an unsigned release artifact for sideload testing. A signed APK/AAB requires a private keystore that must never be committed.
+
+## Duplicate / scam detection
+
+Every accepted receipt is checked for a transaction reference (TrxID, Transaction ID, Txn ID, or Tx ID). The first time an ID appears it is recorded in encrypted local storage and the receipt is relayed normally. If the same ID appears again, PulseRelay:
+
+1. Marks the event as a scam alert in the app (the dashboard scam counter increments).
+2. Sends a distinct `🚨 SCAM ALERT — duplicate transaction ID` message to Telegram instead of a normal receipt.
+
+Phone numbers are never mistaken for transaction IDs, and the tracked-ID registry is capped to keep storage bounded.
 
 ## Telegram setup
 

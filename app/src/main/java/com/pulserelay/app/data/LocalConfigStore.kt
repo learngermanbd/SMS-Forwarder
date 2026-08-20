@@ -3,6 +3,7 @@ package com.pulserelay.app.data
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.pulserelay.app.domain.DuplicateDetector
 import com.pulserelay.app.domain.Provider
 
 class LocalConfigStore(context: Context) {
@@ -39,6 +40,26 @@ class LocalConfigStore(context: Context) {
             .toSet()
         set(value) = prefs.edit().putStringSet(KEY_PROVIDERS, value.map { it.name }.toSet()).apply()
 
+    var seenTransactionIds: Set<String>
+        get() = prefs.getStringSet(KEY_SEEN_TRX, emptySet()).orEmpty().toSet()
+        set(value) = prefs.edit().putStringSet(KEY_SEEN_TRX, value).apply()
+
+    var scamAlertCount: Int
+        get() = prefs.getInt(KEY_SCAM_COUNT, 0)
+        set(value) = prefs.edit().putInt(KEY_SCAM_COUNT, value).apply()
+
+    /** Records a transaction ID and reports whether it was already seen. */
+    fun recordTransactionId(id: String): Boolean {
+        val seen = seenTransactionIds
+        val (isDuplicate, updated) = DuplicateDetector.register(id, seen)
+        if (!isDuplicate) seenTransactionIds = updated
+        return isDuplicate
+    }
+
+    fun incrementScamAlertCount() {
+        scamAlertCount = scamAlertCount + 1
+    }
+
     fun clear() = prefs.edit().clear().apply()
 
     private companion object {
@@ -47,5 +68,7 @@ class LocalConfigStore(context: Context) {
         const val KEY_RELAY_ENABLED = "relay_enabled"
         const val KEY_REDACT_SENSITIVE = "redact_sensitive"
         const val KEY_PROVIDERS = "enabled_providers"
+        const val KEY_SEEN_TRX = "seen_transaction_ids"
+        const val KEY_SCAM_COUNT = "scam_alert_count"
     }
 }

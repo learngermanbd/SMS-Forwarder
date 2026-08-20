@@ -153,6 +153,8 @@ private fun PulseRelayApp() {
                     relayEnabled = it
                     configStore.relayEnabled = it
                 },
+                activeProviders = listOf(bkashEnabled, nagadEnabled, rocketEnabled).count { it },
+                scamAlerts = configStore.scamAlertCount,
             )
             AppTab.RULES -> RulesScreen(
                 modifier = Modifier.padding(padding),
@@ -192,6 +194,8 @@ private fun DashboardScreen(
     modifier: Modifier = Modifier,
     relayEnabled: Boolean,
     onRelayToggle: (Boolean) -> Unit,
+    activeProviders: Int,
+    scamAlerts: Int,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -203,8 +207,8 @@ private fun DashboardScreen(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard(Modifier.weight(1f), "12", "Matched today", PulseColors.mint)
-                MetricCard(Modifier.weight(1f), "0", "Needs review", PulseColors.amber)
+                MetricCard(Modifier.weight(1f), "$activeProviders", "Active providers", PulseColors.mint)
+                MetricCard(Modifier.weight(1f), "$scamAlerts", "Scam alerts", PulseColors.amber)
             }
         }
         item {

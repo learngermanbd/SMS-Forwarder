@@ -13,6 +13,7 @@ import com.pulserelay.app.data.LocalConfigStore
 import com.pulserelay.app.domain.FilterSettings
 import com.pulserelay.app.domain.IncomingMessage
 import com.pulserelay.app.domain.MessageFilter
+import com.pulserelay.app.domain.TransactionIdExtractor
 
 class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -35,10 +36,16 @@ class SmsReceiver : BroadcastReceiver() {
         )
         if (!decision.accepted || decision.provider == null || decision.safeBody == null) return
 
+        val transactionId = TransactionIdExtractor.extract(incoming.body)
+        val isDuplicate = transactionId != null && config.recordTransactionId(transactionId)
+        if (isDuplicate) config.incrementScamAlertCount()
+
         val payload = Data.Builder()
             .putString(RelayWorker.KEY_PROVIDER, decision.provider.label)
             .putString(RelayWorker.KEY_BODY, decision.safeBody)
             .putLong(RelayWorker.KEY_RECEIVED_AT, incoming.receivedAt)
+            .putString(RelayWorker.KEY_TRANSACTION_ID, transactionId.orEmpty())
+            .putBoolean(RelayWorker.KEY_IS_SCAM_ALERT, isDuplicate)
             .build()
         val request = OneTimeWorkRequestBuilder<RelayWorker>()
             .setInputData(payload)
