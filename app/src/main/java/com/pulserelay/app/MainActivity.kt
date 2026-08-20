@@ -69,6 +69,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -82,8 +83,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
@@ -258,6 +263,12 @@ private fun PulseRelayApp() {
                 hasSmsPermission = hasSmsPermission,
                 hasNotificationPermission = hasNotificationPermission,
                 onRequestPermissions = { requestPermissions() },
+                onDataImported = {
+                    relayEnabled = configStore.relayEnabled
+                    redactSensitive = configStore.redactSensitiveData
+                    selectedSenders = configStore.selectedSenders
+                    activityEntries = configStore.activityHistory()
+                },
             )
         }
     }
@@ -474,12 +485,60 @@ private fun SettingsScreen(
     hasSmsPermission: Boolean,
     hasNotificationPermission: Boolean,
     onRequestPermissions: () -> Unit,
+    onDataImported: () -> Unit,
 ) {
     val context = LocalContext.current
     val configStore = remember { LocalConfigStore(context) }
+    val scope = rememberCoroutineScope()
     var botToken by rememberSaveable { mutableStateOf(configStore.botToken) }
     var channelId by rememberSaveable { mutableStateOf(configStore.channelId) }
     var saved by rememberSaveable { mutableStateOf(false) }
+    var backupStatus by remember { mutableStateOf<String?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri)?.use { stream ->
+                            stream.write(configStore.exportBackup().toByteArray())
+                        } ?: error("Cannot open backup file")
+                    }.isSuccess
+                }
+                backupStatus = if (ok) "Backup exported" else "Export failed"
+                Toast.makeText(context, backupStatus, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val message = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val json = context.contentResolver.openInputStream(uri)
+                            ?.bufferedReader()
+                            ?.use { it.readText() }
+                            .orEmpty()
+                        configStore.importBackup(json).getOrThrow()
+                        "Backup imported"
+                    }.getOrElse { "Import failed" }
+                }
+                backupStatus = message
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                if (message == "Backup imported") {
+                    botToken = configStore.botToken
+                    channelId = configStore.channelId
+                    saved = true
+                    onDataImported()
+                }
+            }
+        }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -550,6 +609,34 @@ private fun SettingsScreen(
                 onRequest = onRequestPermissions,
                 accent = PulseColors.blue,
             )
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Settings, null, tint = PulseColors.blue, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(10.dp))
+                        Text("Backup & restore", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    Text("Move your settings and data to another phone. The backup file contains your bot token, so keep it private.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(onClick = { exportLauncher.launch("pulserelay-backup.json") }, modifier = Modifier.weight(1f)) {
+                            Text("Export")
+                        }
+                        OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json")) }, modifier = Modifier.weight(1f)) {
+                            Text("Import")
+                        }
+                    }
+                    backupStatus?.let { status ->
+                        Text(
+                            status,
+                            color = if (status == "Export failed" || status == "Import failed") PulseColors.amber else PulseColors.mint,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
         }
         item {
             AnimatedVisibility(visible = relayEnabled) {

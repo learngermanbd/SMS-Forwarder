@@ -82,20 +82,56 @@ class LocalConfigStore(context: Context) {
 
     fun recordActivity(entry: ActivityEntry) {
         val entries = (listOf(entry) + activityHistory()).take(MAX_ACTIVITY_ENTRIES)
-        val array = JSONArray()
-        entries.forEach { item ->
-            array.put(
-                JSONObject()
-                    .put("t", item.timestamp)
-                    .put("p", item.provider)
-                    .put("s", item.summary)
-                    .put("scam", item.isScam),
-            )
-        }
-        prefs.edit().putString(KEY_ACTIVITY, array.toString()).apply()
+        prefs.edit().putString(KEY_ACTIVITY, encodeActivity(entries).toString()).apply()
     }
 
     fun clearActivity() = prefs.edit().remove(KEY_ACTIVITY).apply()
+
+    /** Serializes all local data so it can be moved to another device. */
+    fun exportBackup(): String {
+        val root = JSONObject()
+            .put("version", BACKUP_VERSION)
+            .put("botToken", botToken)
+            .put("channelId", channelId)
+            .put("relayEnabled", relayEnabled)
+            .put("redactSensitiveData", redactSensitiveData)
+            .put("selectedSenders", JSONArray(selectedSenders.toList()))
+            .put("seenTransactionIds", JSONArray(seenTransactionIds.toList()))
+            .put("scamAlertCount", scamAlertCount)
+            .put("activity", encodeActivity(activityHistory()))
+        return root.toString(2)
+    }
+
+    /** Restores local data from a previously exported backup. */
+    fun importBackup(json: String): Result<Unit> = runCatching {
+        val root = JSONObject(json)
+        botToken = root.optString("botToken", "")
+        channelId = root.optString("channelId", "")
+        relayEnabled = root.optBoolean("relayEnabled", false)
+        redactSensitiveData = root.optBoolean("redactSensitiveData", true)
+        selectedSenders = readStringArray(root.optJSONArray("selectedSenders"))
+        seenTransactionIds = readStringArray(root.optJSONArray("seenTransactionIds"))
+        scamAlertCount = root.optInt("scamAlertCount", 0)
+        root.optJSONArray("activity")?.let { array ->
+            prefs.edit().putString(KEY_ACTIVITY, array.toString()).apply()
+        }
+    }
+
+    private fun readStringArray(array: JSONArray?): Set<String> =
+        array?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
+
+    private fun encodeActivity(entries: List<ActivityEntry>): JSONArray =
+        JSONArray().apply {
+            entries.forEach { item ->
+                put(
+                    JSONObject()
+                        .put("t", item.timestamp)
+                        .put("p", item.provider)
+                        .put("s", item.summary)
+                        .put("scam", item.isScam),
+                )
+            }
+        }
 
     fun clear() = prefs.edit().clear().apply()
 
@@ -109,5 +145,6 @@ class LocalConfigStore(context: Context) {
         const val KEY_SCAM_COUNT = "scam_alert_count"
         const val KEY_ACTIVITY = "activity_history"
         const val MAX_ACTIVITY_ENTRIES = 50
+        const val BACKUP_VERSION = 1
     }
 }
