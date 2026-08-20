@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,17 +15,13 @@ android {
         // Android 10 (API 29) through current Android releases.
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.2.1"
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -32,6 +30,12 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
     }
 }
 

@@ -25,14 +25,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Rule
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Rule
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sms
@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
 
 private enum class AppTab(val label: String, val icon: ImageVector) {
     DASHBOARD("Home", Icons.Default.Dashboard),
-    RULES("Rules", Icons.Default.Rule),
+    RULES("Rules", Icons.AutoMirrored.Filled.Rule),
     SETTINGS("Settings", Icons.Default.Settings),
 }
 
@@ -224,7 +224,7 @@ private fun DashboardScreen(
                 provider = "Nagad",
                 detail = "Payment received  •  delivered",
                 time = "Today, 10:42 AM",
-                icon = Icons.Default.Send,
+                icon = Icons.AutoMirrored.Filled.Send,
                 tint = PulseColors.blue,
             )
         }
@@ -360,7 +360,7 @@ private fun SettingsScreen(modifier: Modifier, relayEnabled: Boolean, onRelayTog
             Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(22.dp)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Send, null, tint = PulseColors.blue, modifier = Modifier.size(22.dp))
+                        Icon(Icons.AutoMirrored.Filled.Send, null, tint = PulseColors.blue, modifier = Modifier.size(22.dp))
                         Spacer(Modifier.size(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Telegram destination", color = Color.White, fontWeight = FontWeight.Bold)
