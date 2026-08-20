@@ -18,7 +18,7 @@ enum class Provider(
 }
 
 data class FilterSettings(
-    val enabledProviders: Set<Provider> = Provider.entries.toSet(),
+    val enabledSenders: Set<String> = emptySet(),
     val redactSensitiveData: Boolean = true,
 )
 
@@ -34,17 +34,25 @@ object MessageFilter {
     private val phonePattern = Regex("(?<!\\d)(?:\\+?880|0)1[3-9]\\d{8}(?!\\d)")
     private val longNumberPattern = Regex("(?<!\\d)\\d{6,}(?!\\d)")
 
-    fun evaluate(message: IncomingMessage, settings: FilterSettings = FilterSettings()): FilterDecision {
-        val sender = message.sender.lowercase().replace(" ", "")
-        val provider = Provider.entries.firstOrNull { providerEntry ->
-            providerEntry.aliases.any(sender::contains)
-        }
+    fun normalizeSender(sender: String): String =
+        sender.trim().lowercase().replace(" ", "")
 
-        if (provider == null) {
-            return FilterDecision(accepted = false, reason = "Sender is not an approved wallet")
+    /** Best-effort wallet brand detection, used only for labeling and quick-select. */
+    fun detectProvider(sender: String): Provider? {
+        val normalized = normalizeSender(sender)
+        return Provider.entries.firstOrNull { entry -> entry.aliases.any(normalized::contains) }
+    }
+
+    fun evaluate(message: IncomingMessage, settings: FilterSettings = FilterSettings()): FilterDecision {
+        val sender = normalizeSender(message.sender)
+        val provider = detectProvider(message.sender)
+        val allowed = settings.enabledSenders.map(::normalizeSender)
+
+        if (allowed.isEmpty()) {
+            return FilterDecision(accepted = false, reason = "No senders selected")
         }
-        if (provider !in settings.enabledProviders) {
-            return FilterDecision(accepted = false, reason = "Provider is disabled")
+        if (sender !in allowed) {
+            return FilterDecision(accepted = false, provider = provider, reason = "Sender is not selected")
         }
         if (otpPattern.containsMatchIn(message.body)) {
             return FilterDecision(accepted = false, provider = provider, reason = "Possible OTP or PIN content")

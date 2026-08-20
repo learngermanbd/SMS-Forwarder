@@ -30,7 +30,7 @@ class SmsReceiver : BroadcastReceiver() {
         val decision = MessageFilter.evaluate(
             incoming,
             FilterSettings(
-                enabledProviders = config.enabledProviders,
+                enabledSenders = config.selectedSenders,
                 redactSensitiveData = config.redactSensitiveData,
             ),
         )

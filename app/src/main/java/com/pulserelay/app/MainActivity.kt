@@ -6,8 +6,10 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import com.pulserelay.app.data.ActivityEntry
+import com.pulserelay.app.data.InboxSender
 import com.pulserelay.app.data.LocalConfigStore
-import com.pulserelay.app.domain.Provider
+import com.pulserelay.app.data.SmsInboxReader
+import com.pulserelay.app.domain.MessageFilter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -50,6 +52,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -106,9 +109,7 @@ private fun PulseRelayApp() {
     var selectedTab by rememberSaveable { mutableStateOf(AppTab.DASHBOARD.name) }
     var relayEnabled by rememberSaveable { mutableStateOf(configStore.relayEnabled) }
     var redactSensitive by rememberSaveable { mutableStateOf(configStore.redactSensitiveData) }
-    var bkashEnabled by rememberSaveable { mutableStateOf(Provider.BKASH in configStore.enabledProviders) }
-    var nagadEnabled by rememberSaveable { mutableStateOf(Provider.NAGAD in configStore.enabledProviders) }
-    var rocketEnabled by rememberSaveable { mutableStateOf(Provider.ROCKET in configStore.enabledProviders) }
+    var selectedSenders by remember { mutableStateOf(configStore.selectedSenders) }
     var activityEntries by remember { mutableStateOf(configStore.activityHistory()) }
 
     var hasSmsPermission by remember {
@@ -214,7 +215,7 @@ private fun PulseRelayApp() {
                     relayEnabled = it
                     configStore.relayEnabled = it
                 },
-                activeProviders = listOf(bkashEnabled, nagadEnabled, rocketEnabled).count { it },
+                activeSenders = selectedSenders.size,
                 scamAlerts = configStore.scamAlertCount,
                 recentEntries = activityEntries,
                 onViewAll = { selectedTab = AppTab.ACTIVITY.name },
@@ -228,18 +229,15 @@ private fun PulseRelayApp() {
                     redactSensitive = it
                     configStore.redactSensitiveData = it
                 },
-                providerStates = listOf(bkashEnabled, nagadEnabled, rocketEnabled),
-                onProviderToggle = { index, enabled ->
-                    when (index) {
-                        0 -> bkashEnabled = enabled
-                        1 -> nagadEnabled = enabled
-                        2 -> rocketEnabled = enabled
-                    }
-                    configStore.enabledProviders = buildSet {
-                        if (bkashEnabled) add(Provider.BKASH)
-                        if (nagadEnabled) add(Provider.NAGAD)
-                        if (rocketEnabled) add(Provider.ROCKET)
-                    }
+                selectedSenders = selectedSenders,
+                onSenderToggle = { address, checked ->
+                    val normalized = MessageFilter.normalizeSender(address)
+                    selectedSenders = if (checked) selectedSenders + normalized else selectedSenders - normalized
+                    configStore.selectedSenders = selectedSenders
+                },
+                onSelectSuggested = { addresses ->
+                    selectedSenders = selectedSenders + addresses.map(MessageFilter::normalizeSender)
+                    configStore.selectedSenders = selectedSenders
                 },
             )
             AppTab.ACTIVITY -> ActivityScreen(
@@ -270,7 +268,7 @@ private fun DashboardScreen(
     modifier: Modifier = Modifier,
     relayEnabled: Boolean,
     onRelayToggle: (Boolean) -> Unit,
-    activeProviders: Int,
+    activeSenders: Int,
     scamAlerts: Int,
     recentEntries: List<ActivityEntry>,
     onViewAll: () -> Unit,
@@ -292,7 +290,7 @@ private fun DashboardScreen(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard(Modifier.weight(1f), "$activeProviders", "Active providers", PulseColors.mint)
+                MetricCard(Modifier.weight(1f), "$activeSenders", "Active senders", PulseColors.mint)
                 MetricCard(Modifier.weight(1f), "$scamAlerts", "Scam alerts", PulseColors.amber)
             }
         }
@@ -381,30 +379,54 @@ private fun RulesScreen(
     modifier: Modifier,
     redactSensitive: Boolean,
     onRedactionToggle: (Boolean) -> Unit,
-    providerStates: List<Boolean>,
-    onProviderToggle: (Int, Boolean) -> Unit,
+    selectedSenders: Set<String>,
+    onSenderToggle: (String, Boolean) -> Unit,
+    onSelectSuggested: (Set<String>) -> Unit,
 ) {
-    val providers = listOf(
-        Triple("bKash", "bK", "Official bKash transaction alerts"),
-        Triple("Nagad", "NG", "Official Nagad transaction alerts"),
-        Triple("Rocket", "RK", "DBBL Rocket transaction alerts"),
-    )
+    val context = LocalContext.current
+    var senders by remember { mutableStateOf<List<InboxSender>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var reloadKey by remember { mutableStateOf(0) }
+
+    LaunchedEffect(reloadKey) {
+        loading = true
+        senders = SmsInboxReader(context).uniqueSenders()
+        loading = false
+    }
+
+    val suggested = senders.filter { MessageFilter.detectProvider(it.address) != null }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Approved sources", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Approved senders", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
-            Text("PulseRelay checks the sender and message content locally before anything can reach Telegram.", color = PulseColors.muted)
-        }
-        items(providers.indices.toList()) { index ->
-            val provider = providers[index]
-            ProviderCard(provider.first, provider.second, provider.third, providerStates[index]) { enabled -> onProviderToggle(index, enabled) }
+            Text("Pick the senders whose receipts should be relayed. Only selected senders can ever reach Telegram.", color = PulseColors.muted)
         }
         item {
-            Spacer(Modifier.height(4.dp))
+            Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Quick select", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = { reloadKey++ }) {
+                            Text("Refresh")
+                        }
+                    }
+                    Text("Automatically select senders that look like bKash, Nagad, or Rocket.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(
+                        onClick = { onSelectSuggested(suggested.map { it.address }.toSet()) },
+                        enabled = suggested.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Select bKash · Nagad · Rocket")
+                    }
+                }
+            }
+        }
+        item {
             SettingCard(
                 icon = Icons.Default.Shield,
                 title = "Redact sensitive numbers",
@@ -414,6 +436,21 @@ private fun RulesScreen(
                 accent = PulseColors.mint,
             )
         }
+        when {
+            loading -> item {
+                Text("Reading your inbox…", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
+            }
+            senders.isEmpty() -> item {
+                EmptySenderCard()
+            }
+            else -> items(senders) { sender ->
+                SenderRow(
+                    sender = sender,
+                    selected = MessageFilter.normalizeSender(sender.address) in selectedSenders,
+                    onToggle = { checked -> onSenderToggle(sender.address, checked) },
+                )
+            }
+        }
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = PulseColors.surface),
@@ -422,7 +459,7 @@ private fun RulesScreen(
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Default.Lock, null, tint = PulseColors.mint, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.size(12.dp))
-                    Text("Privacy first. OTP and PIN messages are blocked even when a provider is enabled.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                    Text("Privacy first. OTP and PIN messages are blocked even for selected senders.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -523,18 +560,39 @@ private fun SettingsScreen(
 }
 
 @Composable
-private fun ProviderCard(name: String, initials: String, description: String, enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+private fun SenderRow(sender: InboxSender, selected: Boolean, onToggle: (Boolean) -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(20.dp)) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(CircleShape).background(PulseColors.surfaceElevated), contentAlignment = Alignment.Center) {
-                Text(initials, color = PulseColors.mint, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.size(14.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(name, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(description, color = PulseColors.muted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(sender.address, color = Color.White, fontWeight = FontWeight.Bold)
+                    MessageFilter.detectProvider(sender.address)?.let { provider ->
+                        Spacer(Modifier.size(8.dp))
+                        Text(provider.label, color = PulseColors.mint, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "${sender.messageCount} messages · ${sender.preview}",
+                    color = PulseColors.muted,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Switch(checked = enabled, onCheckedChange = onEnabledChange)
+            Spacer(Modifier.size(12.dp))
+            Checkbox(checked = selected, onCheckedChange = onToggle)
+        }
+    }
+}
+
+@Composable
+private fun EmptySenderCard() {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.surface), shape = RoundedCornerShape(18.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Sms, null, tint = PulseColors.muted, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.size(12.dp))
+            Text("No SMS messages found. Grant SMS access, then refresh.", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
