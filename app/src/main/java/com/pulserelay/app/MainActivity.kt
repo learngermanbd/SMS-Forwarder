@@ -145,12 +145,9 @@ private fun PulseRelayApp() {
         if (needed.isNotEmpty()) permissionLauncher.launch(needed.toTypedArray())
     }
 
-    var permissionPrompted by rememberSaveable { mutableStateOf(false) }
+    // Ask for every required runtime permission up front, on each launch, until granted.
     LaunchedEffect(Unit) {
-        if (!permissionPrompted) {
-            permissionPrompted = true
-            requestPermissions()
-        }
+        requestPermissions()
     }
 
     LaunchedEffect(selectedTab) {
@@ -221,6 +218,8 @@ private fun PulseRelayApp() {
                 scamAlerts = configStore.scamAlertCount,
                 recentEntries = activityEntries,
                 onViewAll = { selectedTab = AppTab.ACTIVITY.name },
+                hasSmsPermission = hasSmsPermission,
+                onRequestPermissions = { requestPermissions() },
             )
             AppTab.RULES -> RulesScreen(
                 modifier = Modifier.padding(padding),
@@ -275,6 +274,8 @@ private fun DashboardScreen(
     scamAlerts: Int,
     recentEntries: List<ActivityEntry>,
     onViewAll: () -> Unit,
+    hasSmsPermission: Boolean,
+    onRequestPermissions: () -> Unit,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -283,6 +284,11 @@ private fun DashboardScreen(
     ) {
         item {
             HeroCard(relayEnabled = relayEnabled, onRelayToggle = onRelayToggle)
+        }
+        if (!hasSmsPermission) {
+            item {
+                PermissionBanner(onRequest = onRequestPermissions)
+            }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -664,6 +670,24 @@ private fun SectionHeading(title: String, action: String, onActionClick: () -> U
                 .clickable(onClick = onActionClick)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         )
+    }
+}
+
+@Composable
+private fun PermissionBanner(onRequest: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.amber.copy(alpha = .12f)), shape = RoundedCornerShape(18.dp)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Sms, null, tint = PulseColors.amber, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.size(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("SMS access needed", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Allow SMS access so wallet receipts can be detected.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.size(12.dp))
+            Button(onClick = onRequest) {
+                Text("Grant")
+            }
+        }
     }
 }
 
