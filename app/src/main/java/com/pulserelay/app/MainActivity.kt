@@ -117,12 +117,20 @@ private fun PulseRelayApp() {
     var selectedTab by rememberSaveable { mutableStateOf(AppTab.DASHBOARD.name) }
     var relayEnabled by rememberSaveable { mutableStateOf(configStore.relayEnabled) }
     var redactSensitive by rememberSaveable { mutableStateOf(configStore.redactSensitiveData) }
+    var blockOtpContent by rememberSaveable { mutableStateOf(configStore.blockOtpContent) }
+    var hideBalance by rememberSaveable { mutableStateOf(configStore.hideBalance) }
     var selectedSenders by remember { mutableStateOf(configStore.selectedSenders) }
     var activityEntries by remember { mutableStateOf(configStore.activityHistory()) }
 
     var hasSmsPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
+                PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    var hasReadSmsPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) ==
                 PackageManager.PERMISSION_GRANTED,
         )
     }
@@ -139,6 +147,8 @@ private fun PulseRelayApp() {
     ) {
         hasSmsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
             PackageManager.PERMISSION_GRANTED
+        hasReadSmsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) ==
+            PackageManager.PERMISSION_GRANTED
         hasNotificationPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
@@ -147,6 +157,7 @@ private fun PulseRelayApp() {
     fun requestPermissions() {
         val needed = buildList {
             if (!hasSmsPermission) add(Manifest.permission.RECEIVE_SMS)
+            if (!hasReadSmsPermission) add(Manifest.permission.READ_SMS)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
@@ -238,6 +249,16 @@ private fun PulseRelayApp() {
                     redactSensitive = it
                     configStore.redactSensitiveData = it
                 },
+                blockOtpContent = blockOtpContent,
+                onBlockOtpToggle = {
+                    blockOtpContent = it
+                    configStore.blockOtpContent = it
+                },
+                hideBalance = hideBalance,
+                onHideBalanceToggle = {
+                    hideBalance = it
+                    configStore.hideBalance = it
+                },
                 selectedSenders = selectedSenders,
                 onSenderToggle = { address, checked ->
                     val normalized = MessageFilter.normalizeSender(address)
@@ -252,6 +273,8 @@ private fun PulseRelayApp() {
                     selectedSenders = emptySet()
                     configStore.selectedSenders = emptySet()
                 },
+                hasReadSmsPermission = hasReadSmsPermission,
+                onRequestPermissions = { requestPermissions() },
             )
             AppTab.ACTIVITY -> ActivityScreen(
                 modifier = Modifier.padding(padding),
@@ -274,6 +297,8 @@ private fun PulseRelayApp() {
                 onDataImported = {
                     relayEnabled = configStore.relayEnabled
                     redactSensitive = configStore.redactSensitiveData
+                    blockOtpContent = configStore.blockOtpContent
+                    hideBalance = configStore.hideBalance
                     selectedSenders = configStore.selectedSenders
                     activityEntries = configStore.activityHistory()
                 },
@@ -399,10 +424,16 @@ private fun RulesScreen(
     modifier: Modifier,
     redactSensitive: Boolean,
     onRedactionToggle: (Boolean) -> Unit,
+    blockOtpContent: Boolean,
+    onBlockOtpToggle: (Boolean) -> Unit,
+    hideBalance: Boolean,
+    onHideBalanceToggle: (Boolean) -> Unit,
     selectedSenders: Set<String>,
     onSenderToggle: (String, Boolean) -> Unit,
     onAddSenders: (Set<String>) -> Unit,
     onRemoveAllSenders: () -> Unit,
+    hasReadSmsPermission: Boolean,
+    onRequestPermissions: () -> Unit,
 ) {
     val context = LocalContext.current
     var senders by remember { mutableStateOf<List<InboxSender>>(emptyList()) }
@@ -410,10 +441,15 @@ private fun RulesScreen(
     var reloadKey by remember { mutableStateOf(0) }
     var query by remember { mutableStateOf("") }
 
-    LaunchedEffect(reloadKey) {
-        loading = true
-        senders = SmsInboxReader(context).uniqueSenders()
-        loading = false
+    LaunchedEffect(reloadKey, hasReadSmsPermission) {
+        if (hasReadSmsPermission) {
+            loading = true
+            senders = SmsInboxReader(context).uniqueSenders()
+            loading = false
+        } else {
+            loading = false
+            senders = emptyList()
+        }
     }
 
     val suggested = senders.filter { MessageFilter.detectProvider(it.address) != null }
@@ -482,13 +518,36 @@ private fun RulesScreen(
             SettingCard(
                 icon = Icons.Default.Shield,
                 title = "Redact sensitive numbers",
-                description = "Hide phone numbers, OTP-like sequences, and PIN content before delivery.",
+                description = "Hide phone numbers and long numeric identifiers before delivery.",
                 checked = redactSensitive,
                 onCheckedChange = onRedactionToggle,
                 accent = PulseColors.mint,
             )
         }
+        item {
+            SettingCard(
+                icon = Icons.Default.Lock,
+                title = "Block OTP & passwords",
+                description = "Do not relay messages that look like one-time codes, PINs, or passwords.",
+                checked = blockOtpContent,
+                onCheckedChange = onBlockOtpToggle,
+                accent = PulseColors.amber,
+            )
+        }
+        item {
+            SettingCard(
+                icon = Icons.Default.Shield,
+                title = "Hide balance amounts",
+                description = "Replace BDT, Tk, and Taka amounts with [balance hidden].",
+                checked = hideBalance,
+                onCheckedChange = onHideBalanceToggle,
+                accent = PulseColors.blue,
+            )
+        }
         when {
+            !hasReadSmsPermission -> item {
+                SmsReadGrantCard(onRequest = onRequestPermissions)
+            }
             loading -> item {
                 Text("Reading your inbox…", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
             }
@@ -724,6 +783,25 @@ private fun EmptySenderCard() {
             Icon(Icons.Default.Sms, null, tint = PulseColors.muted, modifier = Modifier.size(22.dp))
             Spacer(Modifier.size(12.dp))
             Text("No SMS messages found. Grant SMS access, then refresh.", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun SmsReadGrantCard(onRequest: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = PulseColors.amber.copy(alpha = .12f)), shape = RoundedCornerShape(18.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Sms, null, tint = PulseColors.amber, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.size(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("SMS reading is off", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Allow reading your messages to list senders and pick the ones to relay.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            OutlinedButton(onClick = onRequest, modifier = Modifier.fillMaxWidth()) {
+                Text("Grant SMS reading")
+            }
         }
     }
 }

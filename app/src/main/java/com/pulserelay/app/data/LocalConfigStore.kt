@@ -34,6 +34,14 @@ class LocalConfigStore(context: Context) {
         get() = prefs.getBoolean(KEY_REDACT_SENSITIVE, true)
         set(value) = prefs.edit().putBoolean(KEY_REDACT_SENSITIVE, value).apply()
 
+    var blockOtpContent: Boolean
+        get() = prefs.getBoolean(KEY_BLOCK_OTP, true)
+        set(value) = prefs.edit().putBoolean(KEY_BLOCK_OTP, value).apply()
+
+    var hideBalance: Boolean
+        get() = prefs.getBoolean(KEY_HIDE_BALANCE, false)
+        set(value) = prefs.edit().putBoolean(KEY_HIDE_BALANCE, value).apply()
+
     var selectedSenders: Set<String>
         get() = prefs.getStringSet(KEY_SENDERS, emptySet()).orEmpty().toSet()
         set(value) = prefs.edit().putStringSet(KEY_SENDERS, value).apply()
@@ -95,6 +103,8 @@ class LocalConfigStore(context: Context) {
             .put("channelId", channelId)
             .put("relayEnabled", relayEnabled)
             .put("redactSensitiveData", redactSensitiveData)
+            .put("blockOtpContent", blockOtpContent)
+            .put("hideBalance", hideBalance)
             .put("selectedSenders", JSONArray(selectedSenders.toList()))
             .put("seenTransactionIds", JSONArray(seenTransactionIds.toList()))
             .put("scamAlertCount", scamAlertCount)
@@ -109,6 +119,8 @@ class LocalConfigStore(context: Context) {
         channelId = root.optString("channelId", "")
         relayEnabled = root.optBoolean("relayEnabled", false)
         redactSensitiveData = root.optBoolean("redactSensitiveData", true)
+        blockOtpContent = root.optBoolean("blockOtpContent", true)
+        hideBalance = root.optBoolean("hideBalance", false)
         selectedSenders = readStringArray(root.optJSONArray("selectedSenders"))
         seenTransactionIds = readStringArray(root.optJSONArray("seenTransactionIds"))
         scamAlertCount = root.optInt("scamAlertCount", 0)
@@ -140,6 +152,8 @@ class LocalConfigStore(context: Context) {
         const val KEY_CHANNEL_ID = "channel_id"
         const val KEY_RELAY_ENABLED = "relay_enabled"
         const val KEY_REDACT_SENSITIVE = "redact_sensitive"
+        const val KEY_BLOCK_OTP = "block_otp"
+        const val KEY_HIDE_BALANCE = "hide_balance"
         const val KEY_SENDERS = "selected_senders"
         const val KEY_SEEN_TRX = "seen_transaction_ids"
         const val KEY_SCAM_COUNT = "scam_alert_count"

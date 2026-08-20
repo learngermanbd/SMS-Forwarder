@@ -15,8 +15,8 @@ class MessageFilterTest {
 
         assertTrue(result.accepted)
         assertEquals(Provider.BKASH, result.provider)
-        assertTrue(result.safeBody!!.contains("[phone redacted]"))
-        assertTrue(result.safeBody!!.contains("[number redacted]"))
+        assertTrue(result.safeBody!!.contains("[phone hidden]"))
+        assertTrue(result.safeBody!!.contains("[number hidden]"))
     }
 
     @Test
@@ -37,12 +37,32 @@ class MessageFilterTest {
     }
 
     @Test
-    fun `rejects otp content even for selected sender`() {
+    fun `rejects otp content by default`() {
         val result = MessageFilter.evaluate(
             IncomingMessage("Nagad", "Your OTP is 123456"),
             FilterSettings(enabledSenders = setOf("nagad")),
         )
         assertFalse(result.accepted)
-        assertEquals("Possible OTP or PIN content", result.reason)
+        assertEquals("Possible OTP, PIN, or password content", result.reason)
+    }
+
+    @Test
+    fun `allows otp content when block option is off`() {
+        val result = MessageFilter.evaluate(
+            IncomingMessage("Nagad", "Your OTP is 123456"),
+            FilterSettings(enabledSenders = setOf("nagad"), blockOtpContent = false),
+        )
+        assertTrue(result.accepted)
+    }
+
+    @Test
+    fun `hides balance when enabled`() {
+        val result = MessageFilter.evaluate(
+            IncomingMessage("bKash", "Cash In BDT 500.00 from 01712345678"),
+            FilterSettings(enabledSenders = setOf("bkash"), hideBalance = true),
+        )
+        assertTrue(result.accepted)
+        assertTrue(result.safeBody!!.contains("[balance hidden]"))
+        assertFalse(result.safeBody!!.contains("500.00"))
     }
 }

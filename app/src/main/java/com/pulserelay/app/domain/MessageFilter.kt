@@ -20,6 +20,8 @@ enum class Provider(
 data class FilterSettings(
     val enabledSenders: Set<String> = emptySet(),
     val redactSensitiveData: Boolean = true,
+    val blockOtpContent: Boolean = true,
+    val hideBalance: Boolean = false,
 )
 
 data class FilterDecision(
@@ -30,9 +32,12 @@ data class FilterDecision(
 )
 
 object MessageFilter {
-    private val otpPattern = Regex("(?i)\\b(otp|one[- ]time|verification|verify|pin|passcode|security code)\\b")
+    private val otpPattern = Regex(
+        "(?i)\\b(otp|one[- ]time|verification|verify|pin|passcode|password|login code|security code)\\b",
+    )
     private val phonePattern = Regex("(?<!\\d)(?:\\+?880|0)1[3-9]\\d{8}(?!\\d)")
     private val longNumberPattern = Regex("(?<!\\d)\\d{6,}(?!\\d)")
+    private val balancePattern = Regex("(?i)\\b(?:bdt|tk|taka|৳)\\s*[\\d,]+(?:\\.\\d+)?")
 
     fun normalizeSender(sender: String): String =
         sender.trim().lowercase().replace(" ", "")
@@ -54,18 +59,20 @@ object MessageFilter {
         if (sender !in allowed) {
             return FilterDecision(accepted = false, provider = provider, reason = "Sender is not selected")
         }
-        if (otpPattern.containsMatchIn(message.body)) {
-            return FilterDecision(accepted = false, provider = provider, reason = "Possible OTP or PIN content")
+        if (settings.blockOtpContent && otpPattern.containsMatchIn(message.body)) {
+            return FilterDecision(accepted = false, provider = provider, reason = "Possible OTP, PIN, or password content")
         }
 
-        val safeBody = if (settings.redactSensitiveData) {
-            message.body
-                .replace(phonePattern, "[phone redacted]")
-                .replace(longNumberPattern, "[number redacted]")
-                .trim()
-        } else {
-            message.body.trim()
+        var safeBody = message.body.trim()
+        if (settings.redactSensitiveData) {
+            safeBody = safeBody
+                .replace(phonePattern, "[phone hidden]")
+                .replace(longNumberPattern, "[number hidden]")
         }
+        if (settings.hideBalance) {
+            safeBody = safeBody.replace(balancePattern, "[balance hidden]")
+        }
+        safeBody = safeBody.trim()
 
         if (safeBody.isBlank()) {
             return FilterDecision(accepted = false, provider = provider, reason = "Message has no safe content")

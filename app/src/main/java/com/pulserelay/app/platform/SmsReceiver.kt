@@ -32,6 +32,8 @@ class SmsReceiver : BroadcastReceiver() {
             FilterSettings(
                 enabledSenders = config.selectedSenders,
                 redactSensitiveData = config.redactSensitiveData,
+                blockOtpContent = config.blockOtpContent,
+                hideBalance = config.hideBalance,
             ),
         )
         if (!decision.accepted || decision.provider == null || decision.safeBody == null) return
