@@ -51,7 +51,7 @@
       <div class="eyebrow">PULSERELAY · ANDROID PRODUCT BLUEPRINT</div>
       <h1>Private wallet alerts, delivered with intention.</h1>
       <p class="lede">A premium Android companion that recognizes Bangladesh bKash, Nagad, and Rocket transaction SMS messages on-device, removes sensitive data, and posts only safe events to an owned Telegram channel through a bot.</p>
-      <div><span class="tag">Kotlin</span><span class="tag">Jetpack Compose</span><span class="tag">Material 3</span><span class="tag">WorkManager</span><span class="tag">Encrypted storage</span></div>
+      <div><span class="tag">Kotlin</span><span class="tag">Jetpack Compose</span><span class="tag">Material 3</span><span class="tag">WorkManager</span><span class="tag">Encrypted storage</span><span class="tag">Android 10+</span></div>
     </header>
 
     <section>
@@ -114,12 +114,21 @@
     </section>
 
     <section>
-      <h2>6. Skill/tooling note</h2>
+      <h2>6. Android support and release policy</h2>
+      <div class="grid two">
+        <article class="card"><h3>Supported baseline</h3><p>Minimum Android 10 / API 29. Target SDK 35 (Android 15). Android 10–15 can be compiled and tested with the corresponding installed SDK platforms.</p></article>
+        <article class="card"><h3>Forward compatibility</h3><p>Android 16–17 can be re-tested as official SDKs become available. The app cannot use Android 17-only APIs until an official compile SDK is installed.</p></article>
+      </div>
+      <div class="card warn" style="margin-top:14px"><div class="icon">APK</div><h3>Release after every change</h3><p>Each change should increment the version, run the relevant checks, build an unsigned release APK, commit and push the source, then publish a GitHub release containing the APK. A private signing keystore is required for a production install and must stay outside GitHub.</p></div>
+    </section>
+
+    <section>
+      <h2>7. Skill/tooling note</h2>
       <div class="card"><p>This checkout did not contain an existing Android project or an available “find skill” installer. The implementation uses the standard Android toolchain already declared in the project: Android Gradle Plugin, Kotlin, Jetpack Compose, Material 3, WorkManager, Android encrypted storage, and OkHttp. No external skill package or production credential was installed.</p></div>
     </section>
 
     <section>
-      <h2>7. Validation gates</h2>
+      <h2>8. Validation gates</h2>
       <ul class="checklist">
         <li>Unit tests prove bKash/Nagad/Rocket matching, unknown-sender rejection, OTP rejection, and redaction.</li>
         <li>Manual device test proves a safe sample is delivered to the private channel.</li>

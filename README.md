@@ -17,11 +17,20 @@ PulseRelay is an Android SMS notification relay for personal, consent-based use.
 
 1. Open this folder in Android Studio Ladybug (or newer).
 2. Let Android Studio create/download the Gradle wrapper if this checkout does not already contain one.
-3. Run the `app` configuration on an Android 8.0+ device/emulator.
+3. Run the `app` configuration on an Android 10+ device/emulator (API 29+).
 4. Grant SMS permission only on a test device where you have consent.
 5. Configure the Telegram bot token and channel ID in the app. Never commit either value.
 
 The app is intentionally not configured with a real bot token, chat ID, or production signing key.
+
+## Android support matrix
+
+- **Minimum supported:** Android 10 / API 29.
+- **Target SDK:** API 35 (Android 15).
+- **Android 10–15:** the project is configured and testable against these platform levels when the matching SDKs are installed.
+- **Android 16–17:** the app is designed to remain compatible through Android's forward-compatibility behavior, but Android 17-specific APIs cannot be compiled until the corresponding official SDK is available. Re-test each new platform release before distribution.
+
+The release APK is an unsigned release artifact for sideload testing. A signed APK/AAB requires a private keystore that must never be committed.
 
 ## Telegram setup
 
