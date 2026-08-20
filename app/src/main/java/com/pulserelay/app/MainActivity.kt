@@ -15,6 +15,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -65,6 +66,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -80,6 +82,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -212,7 +215,8 @@ private fun PulseRelayApp() {
             }
         },
     ) { padding ->
-        when (AppTab.valueOf(selectedTab)) {
+        Crossfade(targetState = AppTab.valueOf(selectedTab), label = "tab") { tab ->
+            when (tab) {
             AppTab.DASHBOARD -> DashboardScreen(
                 modifier = Modifier.padding(padding),
                 relayEnabled = relayEnabled,
@@ -240,9 +244,13 @@ private fun PulseRelayApp() {
                     selectedSenders = if (checked) selectedSenders + normalized else selectedSenders - normalized
                     configStore.selectedSenders = selectedSenders
                 },
-                onSelectSuggested = { addresses ->
+                onAddSenders = { addresses ->
                     selectedSenders = selectedSenders + addresses.map(MessageFilter::normalizeSender)
                     configStore.selectedSenders = selectedSenders
+                },
+                onRemoveAllSenders = {
+                    selectedSenders = emptySet()
+                    configStore.selectedSenders = emptySet()
                 },
             )
             AppTab.ACTIVITY -> ActivityScreen(
@@ -270,6 +278,7 @@ private fun PulseRelayApp() {
                     activityEntries = configStore.activityHistory()
                 },
             )
+            }
         }
     }
 }
@@ -392,12 +401,14 @@ private fun RulesScreen(
     onRedactionToggle: (Boolean) -> Unit,
     selectedSenders: Set<String>,
     onSenderToggle: (String, Boolean) -> Unit,
-    onSelectSuggested: (Set<String>) -> Unit,
+    onAddSenders: (Set<String>) -> Unit,
+    onRemoveAllSenders: () -> Unit,
 ) {
     val context = LocalContext.current
     var senders by remember { mutableStateOf<List<InboxSender>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var reloadKey by remember { mutableStateOf(0) }
+    var query by remember { mutableStateOf("") }
 
     LaunchedEffect(reloadKey) {
         loading = true
@@ -406,6 +417,9 @@ private fun RulesScreen(
     }
 
     val suggested = senders.filter { MessageFilter.detectProvider(it.address) != null }
+    val filteredSenders = remember(query, senders) {
+        if (query.isBlank()) senders else senders.filter { it.address.contains(query, ignoreCase = true) }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -428,12 +442,39 @@ private fun RulesScreen(
                     }
                     Text("Automatically select senders that look like bKash, Nagad, or Rocket.", color = PulseColors.muted, style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(
-                        onClick = { onSelectSuggested(suggested.map { it.address }.toSet()) },
+                        onClick = { onAddSenders(suggested.map { it.address }.toSet()) },
                         enabled = suggested.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("Select bKash · Nagad · Rocket")
                     }
+                }
+            }
+        }
+        item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Search senders") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { onAddSenders(senders.map { it.address }.toSet()) },
+                    enabled = senders.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Select all")
+                }
+                OutlinedButton(
+                    onClick = onRemoveAllSenders,
+                    enabled = selectedSenders.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Clear all")
                 }
             }
         }
@@ -454,7 +495,10 @@ private fun RulesScreen(
             senders.isEmpty() -> item {
                 EmptySenderCard()
             }
-            else -> items(senders) { sender ->
+            filteredSenders.isEmpty() -> item {
+                Text("No senders match \"$query\".", color = PulseColors.muted, style = MaterialTheme.typography.bodyMedium)
+            }
+            else -> items(filteredSenders) { sender ->
                 SenderRow(
                     sender = sender,
                     selected = MessageFilter.normalizeSender(sender.address) in selectedSenders,
@@ -876,6 +920,15 @@ private object PulseColors {
     val muted = Color(0xFF91A0B4)
 }
 
+private val PulseTypography = Typography(
+    headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.4).sp),
+    titleMedium = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
+    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
+    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 17.sp),
+    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp),
+    labelSmall = TextStyle(fontSize = 11.sp, letterSpacing = 0.1.sp),
+)
+
 @Composable
 private fun PulseRelayTheme(content: @Composable () -> Unit) {
     MaterialTheme(
@@ -887,6 +940,7 @@ private fun PulseRelayTheme(content: @Composable () -> Unit) {
             surface = PulseColors.surface,
             onSurface = Color.White,
         ),
+        typography = PulseTypography,
         content = content,
     )
 }

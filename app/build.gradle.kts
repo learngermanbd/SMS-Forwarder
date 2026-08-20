@@ -15,8 +15,8 @@ android {
         // Android 10 (API 29) through current Android releases.
         minSdk = 29
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.6.0"
+        versionCode = 9
+        versionName = "0.7.0"
     }
 
     compileOptions {
