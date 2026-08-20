@@ -30,6 +30,10 @@ class LocalConfigStore(context: Context) {
         get() = prefs.getBoolean(KEY_RELAY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_RELAY_ENABLED, value).apply()
 
+    var hasCompletedSetupGuide: Boolean
+        get() = prefs.getBoolean(KEY_SETUP_GUIDE_COMPLETE, false)
+        set(value) = prefs.edit().putBoolean(KEY_SETUP_GUIDE_COMPLETE, value).apply()
+
     var redactSensitiveData: Boolean
         get() = prefs.getBoolean(KEY_REDACT_SENSITIVE, true)
         set(value) = prefs.edit().putBoolean(KEY_REDACT_SENSITIVE, value).apply()
@@ -151,6 +155,7 @@ class LocalConfigStore(context: Context) {
         const val KEY_BOT_TOKEN = "bot_token"
         const val KEY_CHANNEL_ID = "channel_id"
         const val KEY_RELAY_ENABLED = "relay_enabled"
+        const val KEY_SETUP_GUIDE_COMPLETE = "setup_guide_complete"
         const val KEY_REDACT_SENSITIVE = "redact_sensitive"
         const val KEY_BLOCK_OTP = "block_otp"
         const val KEY_HIDE_BALANCE = "hide_balance"

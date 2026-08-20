@@ -36,3 +36,10 @@ class TelegramBotClient(
             }
         }
 }
+
+object TelegramStatusMessages {
+    const val API_SETUP_SUCCESS = "✅ SMS FORWARDER Telegram API setup succeeded.\nStatus: connected and ready to send SMS relay alerts."
+    const val API_SETUP_FAILED = "❌ SMS FORWARDER Telegram API setup failed.\nStatus: the new Telegram configuration was rejected."
+    const val RELAY_ON = "🟢 SMS FORWARDER is ON.\nStatus: incoming approved SMS alerts will be sent here."
+    const val RELAY_OFF = "⚪ SMS FORWARDER is OFF.\nStatus: incoming SMS alerts are currently paused."
+}

@@ -25,13 +25,13 @@ class RelayWorker(
         val text = if (isScamAlert) {
             buildString {
                 appendLine("🚨 SCAM ALERT — duplicate transaction ID")
-                appendLine("PulseRelay • $provider")
+                appendLine("SMS FORWARDER • $provider")
                 if (transactionId.isNotBlank()) appendLine("TrxID: $transactionId")
                 append("This receipt was received before and may be a fake payment confirmation.")
             }
         } else {
             buildString {
-                appendLine("PulseRelay • $provider")
+                appendLine("SMS FORWARDER • $provider")
                 if (transactionId.isNotBlank()) appendLine("TrxID: $transactionId")
                 append(body)
             }

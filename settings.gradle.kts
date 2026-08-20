@@ -16,5 +16,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PulseRelay"
+rootProject.name = "SMS FORWARDER"
 include(":app")

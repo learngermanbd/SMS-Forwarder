@@ -1,8 +1,8 @@
-# PulseRelay
+# SMS FORWARDER
 
-PulseRelay is an Android SMS notification relay for personal, consent-based use. It recognizes Bangladesh mobile-finance alerts from **bKash**, **Nagad**, and **Rocket**, applies privacy filters on-device, and can send a redacted event to a Telegram channel through a bot.
+SMS FORWARDER is an Android SMS notification relay for personal, consent-based use. It recognizes Bangladesh mobile-finance alerts from **bKash**, **Nagad**, and **Rocket**, applies privacy filters on-device, and can send a redacted event to a Telegram channel through a bot.
 
-> **Safety default:** financial SMS messages can contain OTPs, PIN hints, account identifiers, and balances. PulseRelay must not forward OTPs, PINs, or an unredacted message. Use it only on a phone and Telegram channel you own or have explicit permission to monitor.
+> **Safety default:** financial SMS messages can contain OTPs, PIN hints, account identifiers, and balances. SMS FORWARDER must not forward OTPs, PINs, or an unredacted message. Use it only on a phone and Telegram channel you own or have explicit permission to monitor.
 
 ## Current foundation
 
@@ -13,6 +13,11 @@ PulseRelay is an Android SMS notification relay for personal, consent-based use.
 - Duplicate transaction ID detection with a clearly marked Telegram scam alert
 - Pure Kotlin filter and detection logic that can be unit tested
 - Android SMS receiver and Telegram delivery worker skeleton
+- First-launch setup guide for Telegram, trusted senders, privacy filters, and relay controls
+
+## First-launch setup guide
+
+New installs open a guided setup flow before the dashboard. It explains the privacy model, walks through Telegram bot and channel setup, prompts the user to choose trusted SMS senders, and explains redaction, OTP blocking, balance hiding, and relay controls. The guide can be skipped and reopened later from **Settings → Open setup guide**.
 
 ## Build locally
 
@@ -35,7 +40,7 @@ The release APK is an unsigned release artifact for sideload testing. A signed A
 
 ## Duplicate / scam detection
 
-Every accepted receipt is checked for a transaction reference (TrxID, Transaction ID, Txn ID, or Tx ID). The first time an ID appears it is recorded in encrypted local storage and the receipt is relayed normally. If the same ID appears again, PulseRelay:
+Every accepted receipt is checked for a transaction reference (TrxID, Transaction ID, Txn ID, or Tx ID). The first time an ID appears it is recorded in encrypted local storage and the receipt is relayed normally. If the same ID appears again, SMS FORWARDER:
 
 1. Marks the event as a scam alert in the app (the dashboard scam counter increments).
 2. Sends a distinct `🚨 SCAM ALERT — duplicate transaction ID` message to Telegram instead of a normal receipt.
@@ -50,9 +55,18 @@ Phone numbers are never mistaken for transaction IDs, and the tracked-ID registr
 4. Save the token only in the app's encrypted local settings.
 5. Test with a non-financial sample notification before enabling the receiver.
 
+SMS FORWARDER sends Telegram status notifications when configuration or forwarding state changes:
+
+- `✅` Telegram API setup succeeded.
+- `❌` Telegram API setup failed (sent through the previous working configuration when available).
+- `🟢` SMS forwarding is ON.
+- `⚪` SMS forwarding is OFF.
+
+A failure notification cannot be delivered when Telegram itself is unreachable or the only available credentials are invalid; the app shows that failure locally instead.
+
 ## Android policy and platform notes
 
-SMS permissions are restricted by Google Play policy. A production Play release may require PulseRelay to be the default SMS handler or qualify for an allowed exception. For a personal sideloaded build, obtain informed consent and follow local law. Most bKash/Nagad/Rocket transaction alerts arrive as SMS; MMS/WAP push is not a reliable source for these notifications and should not be treated as equivalent to SMS.
+SMS permissions are restricted by Google Play policy. A production Play release may require SMS FORWARDER to be the default SMS handler or qualify for an allowed exception. For a personal sideloaded build, obtain informed consent and follow local law. Most bKash/Nagad/Rocket transaction alerts arrive as SMS; MMS/WAP push is not a reliable source for these notifications and should not be treated as equivalent to SMS.
 
 ## Planned phases
 

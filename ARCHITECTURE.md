@@ -1,4 +1,4 @@
-# PulseRelay blueprint
+# SMS FORWARDER blueprint
 
 ## Product promise
 
@@ -48,14 +48,12 @@ app/src/main/java/com/pulserelay/app/
 │   └── NotificationChannels.kt
 ├── network/
 │   └── TelegramBotClient.kt
-└── ui/
-    ├── PulseRelayApp.kt
-    ├── theme/
-    └── screens/
+└── MainActivity.kt                     # Compose UI entry point
 ```
 
 ## UI structure
 
+- **First launch:** guided setup flow covering Telegram connection, trusted sender selection, privacy filters, and relay controls; can be reopened from Settings.
 - **Dashboard:** connection health, matched count, queue state, last safe event, pause/resume.
 - **Rules:** three provider cards, sender matching explanation, privacy redaction switch, rejected-message count.
 - **Settings:** Telegram token and channel ID, test send, notification settings, delete data, privacy explanation.
